@@ -80,11 +80,12 @@ def tradingview(pazar, adet, siralama, oranlar=False):
 
 
 def bist_onerileri(satirlar):
-    """Büyük şirketler (piyasa değerine göre ilk 150) içinde F/K 0-12 ve özsermaye kârlılığı %15 üstü olanlar."""
+    """Büyük şirketler (piyasa değerine göre ilk 100) içinde F/K 2-12 ve özsermaye kârlılığı %15-%60 olanlar.
+    Çok yüksek ROE ve çok düşük F/K çoğunlukla tek seferlik kazanç veya enflasyon muhasebesi etkisidir; dışarıda bırakılır."""
     adaylar = []
-    for d in satirlar[:150]:
+    for d in satirlar[:100]:
         kod, f, ch, fk, roe, pd, tv, ad = d
-        if isinstance(fk, (int, float)) and isinstance(roe, (int, float)) and 0 < fk < 12 and roe > 15:
+        if isinstance(fk, (int, float)) and isinstance(roe, (int, float)) and 2 < fk < 12 and 15 < roe < 60:
             adaylar.append({"kod": kod, "ad": (ad or "")[:40], "fk": round(fk, 1), "roe": round(roe, 1),
                             "temettu": round(tv, 1) if isinstance(tv, (int, float)) else None})
     adaylar.sort(key=lambda x: -x["roe"])
@@ -138,50 +139,82 @@ def tefas():
         sec_.sort(key=lambda r: -getiri(r))
         return [{"kod": r["fonKodu"].upper(), "ad": (r.get("fonUnvan") or "")[:70], "getiri1y": r.get("getiri1y"), "getiriyb": r.get("getiriyb"),
                  "getiri1a": r.get("getiri1a"), "risk": r.get("riskDegeri")} for r in sec_[:adet]]
-    oneri = {"kira": sec(lambda u, t: "KİRA SERTİFİKA" in u), "altin": sec(lambda u, t: "ALTIN" in u and "HİSSE" not in u)}
+    oneri = {"kira": sec(lambda u, t: "KİRA SERTİFİKA" in u), "altin": sec(lambda u, t: ("ALTIN FON" in u or "ALTIN KATILIM" in u) and not any(x in u for x in ("GÜMÜŞ", "HİSSE", "PLATİN", "PALADYUM")))}
     return fiyatlar, (tarihler[-1] if tarihler else None), oneri
 
 
 HABER_DISI = {"BIST", "TCMB", "ABD", "FED", "USD", "EUR", "TRY", "GSYH", "TÜFE", "TUFE", "KAP", "SPK", "CEO", "IPO", "ETF", "MIDAS", "AB", "BM", "IMF", "OPEC", "NATO", "AI", "GDP", "CPI", "PMI", "ECB", "BOJ", "THE", "AND", "FOR"}
 
 
+def _hisseler(baslik, ozet, bist, abd):
+    import re
+    hisseler = []
+    def ekle(kod, min_uzunluk):
+        if len(kod) < min_uzunluk or kod in HABER_DISI or any(h[0] == kod for h in hisseler):
+            return
+        if kod in bist:
+            hisseler.append([kod, "bist"])
+        elif kod in abd:
+            hisseler.append([kod, "abd"])
+    for kod in re.findall(r"\b[A-ZÇĞİÖŞÜ0-9]{2,6}\b", baslik):
+        ekle(kod, 2)
+    for kod in re.findall(r"\b[A-Z]{4,6}\b", ozet):
+        if len(hisseler) >= 6:
+            break
+        if kod in bist:
+            ekle(kod, 4)
+    return hisseler[:6]
+
+
 def midas_haberleri(bist, abd):
-    """Midas RSS'inden son haber başlıkları. Haber metnini saklamıyoruz; başlık, bağlantı, tarih ve başlıkta geçen hisseler."""
+    """Midas'ın Kulakları'ndaki son haber başlıkları. Haber metnini saklamıyoruz: başlık, bağlantı, tarih
+    ve başlıkta/özette geçen hisse kodları."""
     import re
     from email.utils import parsedate_to_datetime
-    kok = ET.fromstring(getir("https://www.getmidas.com/feed/"))
     haberler = []
-    for item in kok.iter("item"):
-        baslik = (item.findtext("title") or "").strip()
-        link = (item.findtext("link") or "").strip()
-        if not baslik or not link.startswith("https://www.getmidas.com/"):
-            continue
+    # 1) Bölümün kendi RSS akışı
+    for adres in ("https://www.getmidas.com/midasin-kulaklari/feed/", "https://www.getmidas.com/feed/?post_type=midasin-kulaklari"):
         try:
-            tarih = parsedate_to_datetime(item.findtext("pubDate")).astimezone(TR).isoformat(timespec="minutes")
+            kok = ET.fromstring(getir(adres))
         except Exception:
-            tarih = None
-        ozet = re.sub(r"<[^>]+>", " ", item.findtext("description") or "")
-        hisseler = []
-        def ekle(kod, min_uzunluk):
-            if len(kod) < min_uzunluk or kod in HABER_DISI or any(h[0] == kod for h in hisseler):
-                return
-            if kod in bist:
-                hisseler.append([kod, "bist"])
-            elif kod in abd:
-                hisseler.append([kod, "abd"])
-        for kod in re.findall(r"\b[A-ZÇĞİÖŞÜ0-9]{2,6}\b", baslik):
-            ekle(kod, 2)
-        for kod in re.findall(r"\b[A-Z]{4,6}\b", ozet):
-            if len(hisseler) >= 6:
-                break
-            if kod in bist:
-                ekle(kod, 4)
-        haberler.append({"b": baslik[:160], "u": link, "t": tarih, "h": hisseler[:6]})
-        if len(haberler) >= 25:
+            continue
+        for item in kok.iter("item"):
+            baslik = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            if not baslik or "/midasin-kulaklari/" not in link:
+                continue
+            try:
+                tarih = parsedate_to_datetime(item.findtext("pubDate")).astimezone(TR).isoformat(timespec="minutes")
+            except Exception:
+                tarih = None
+            ozet = re.sub(r"<[^>]+>", " ", item.findtext("description") or "")
+            haberler.append({"b": baslik[:160], "u": link, "t": tarih, "h": _hisseler(baslik, ozet, bist, abd)})
+        if haberler:
             break
+    # 2) WordPress veri kaynağı (bölüm ayrı bir içerik türüyse)
     if not haberler:
-        raise ValueError("RSS'te haber bulunamadı")
-    return haberler
+        turler = json.loads(getir("https://www.getmidas.com/wp-json/wp/v2/types"))
+        taban = None
+        for t in turler.values():
+            metin = (t.get("slug", "") + " " + t.get("rest_base", "") + " " + t.get("name", "")).lower()
+            if "kulak" in metin:
+                taban = t.get("rest_base") or t.get("slug")
+                break
+        if not taban:
+            raise ValueError("haber içerik türü bulunamadı: " + ", ".join(list(turler)[:12]))
+        kayitlar = json.loads(getir(f"https://www.getmidas.com/wp-json/wp/v2/{taban}?per_page=25&_fields=title,link,date,excerpt"))
+        import html as _html
+        for r in kayitlar:
+            baslik = _html.unescape(re.sub(r"<[^>]+>", "", (r.get("title") or {}).get("rendered", ""))).strip()
+            link = r.get("link") or ""
+            ozet = re.sub(r"<[^>]+>", " ", (r.get("excerpt") or {}).get("rendered", ""))
+            tarih = (r.get("date") or "")[:16]
+            haberler.append({"b": baslik[:160], "u": link, "t": (tarih + "+03:00") if tarih else None, "h": _hisseler(baslik, ozet, bist, abd)})
+    haberler = [h for h in haberler if h["b"] and h["u"].startswith("https://www.getmidas.com/")]
+    haberler.sort(key=lambda h: h["t"] or "", reverse=True)
+    if not haberler:
+        raise ValueError("haber bulunamadı")
+    return haberler[:25]
 
 
 def main():
