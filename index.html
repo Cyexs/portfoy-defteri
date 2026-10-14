@@ -90,6 +90,14 @@ button { cursor: pointer; }
 .hero .lbl { font-size: 13px; opacity: .72; }
 .hero .big { font-family: var(--f-display); font-size: clamp(34px, 10vw, 46px); line-height: 1.05; margin: 6px 0 12px; letter-spacing: -0.02em; }
 .hero .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .toprow { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; z-index: 1; }
+.hero .refresh { border: 0; border-radius: 999px; width: 40px; height: 40px; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 14%, transparent); color: var(--bg); cursor: pointer; }
+.hero .refresh svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hero .refresh:disabled { opacity: .7; cursor: default; }
+.hero .refresh.spin svg { animation: spin 1s linear infinite; }
+.hero .esd { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--f-num); font-size: 14px; opacity: .85; margin: -4px 0 14px; position: relative; z-index: 1; }
+.hero .info { font-size: 12px; opacity: .68; margin-top: 12px; line-height: 1.5; position: relative; z-index: 1; }
+.hero .big, .hero .chips { position: relative; z-index: 1; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; font-family: var(--f-num); }
 .chip.good { background: var(--good-bg); color: var(--good); }
 .chip.bad { background: var(--bad-bg); color: var(--bad); }
@@ -436,6 +444,51 @@ button { cursor: pointer; }
     render(); return true;
   }
 
+  /* ---------- market prices: one button updates FX, gold and every position ---------- */
+  S.piyasa = null;
+  const piyasaFiyat = (p) => {
+    if (p.altinTur) return altinFiyat(p.altinTur);
+    const pz = S.piyasa; if (!pz) return null;
+    const kod = String(p.kod || '').toUpperCase().trim();
+    const al = (m) => m && Number(m[kod]) > 0 ? Number(m[kod]) : null;
+    if (p.birim === 'USD') return al(pz.abd);
+    if (p.grup === 'kira' || p.grup === 'altin') return al(pz.fon) || al(pz.bist);
+    return al(pz.bist) || al(pz.fon);
+  };
+  let guncelleniyor = false;
+  async function guncelleTumu(sessiz) {
+    if (guncelleniyor) return false;
+    guncelleniyor = true; render();
+    const [kur, altin, piyasa] = await Promise.all([readOrtak('kur'), readOrtak('altin'), readOrtak('piyasa')]);
+    if (!kur || !altin || !piyasa) {
+      guncelleniyor = false; render();
+      if (!sessiz) hataSheet();
+      return false;
+    }
+    S.ortakKur = kur; S.ortakAltin = altin; S.piyasa = piyasa;
+    if (S.p.kurKaynak !== 'elle' || !sessiz) { S.p.kur = Number(kur.usdtry); S.p.kurKaynak = 'TCMB'; S.p.kurTarih = kur.tarih; }
+    const eksik = [];
+    const arr = S.p.pozisyonlar.map(p => {
+      const f = piyasaFiyat(p);
+      if (!f) { eksik.push(p.altinTur && AN[p.altinTur] ? AN[p.altinTur].n : p.kod); return p; }
+      return Number(p.fiyat) === f ? p : { ...p, fiyat: f };
+    });
+    S.p.sonGuncelleme = { zaman: new Date().toISOString(), kur: S.p.kur, gram: altinFiyat('gram'), bulunan: arr.length - eksik.length, eksik };
+    await commitPositions(arr, false);
+    guncelleniyor = false; render();
+    if (!sessiz) toast(eksik.length ? (arr.length - eksik.length) + ' varlık güncellendi · fiyatı bulunamayan: ' + eksik.join(', ') : 'Tüm varlıklar güncellendi');
+    return true;
+  }
+  function hataSheet() {
+    const son = S.p.sonGuncelleme && S.p.sonGuncelleme.zaman;
+    const sh = openSheet('Şu an güncellenemedi', [
+      el('p', { style: 'margin:0', text: 'Bağlantı kopmuş ya da fiyat kaynağına şu an ulaşılamıyor olabilir. Lütfen daha sonra tekrar deneyin.' }),
+      el('div', { class: 'note', text: son ? 'Son güncel değerler gösteriliyor (' + trTime(son) + ').' : 'Son kaydedilen değerler gösteriliyor.' }),
+      el('button', { class: 'btn', type: 'button', text: 'Tekrar dene', onclick: () => { sh.close(); guncelleTumu(false); } }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Tamam', onclick: () => sh.close() })
+    ]);
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
     render();
@@ -486,6 +539,9 @@ button { cursor: pointer; }
     else if (S.ortakKur && !S.p.pozisyonlar.length && S.p.kurKaynak === 'elle' && !S.p.kurTarih) await applyKur(S.ortakKur, true);
     await applyAltin();
     render();
+    const sg = S.p.sonGuncelleme && Date.parse(S.p.sonGuncelleme.zaman);
+    if (S.p.pozisyonlar.length && (!sg || Date.now() - sg > 10 * 60 * 1000)) guncelleTumu(true);
+    else S.piyasa = await readOrtak('piyasa');
   }
   const strip = (o) => { const c = { ...o }; delete c.id; return c; };
 
@@ -556,11 +612,17 @@ button { cursor: pointer; }
   function scrOzet() {
     const t = totals(), has = S.p.pozisyonlar.length > 0;
     const nf = nextFirst(); const days = Math.ceil((nf - new Date()) / 864e5);
+    const sg = S.p.sonGuncelleme;
+    const gram = (sg && sg.gram) || altinFiyat('gram'), kurN = (sg && sg.kur) || S.p.kur;
+    const refresh = el('button', { class: 'refresh' + (guncelleniyor ? ' spin' : ''), type: 'button', 'aria-label': 'Fiyatları güncelle', title: 'Fiyatları güncelle', disabled: guncelleniyor ? 'disabled' : false, onclick: () => guncelleTumu(false) }, [icon('refresh')]);
+    const usd = has && kurN ? t.T / kurN : null, gr = has && gram ? t.T / gram : null;
     const hero = el('section', { class: 'hero' }, [
       el('div', { class: 'coin' }),
-      el('div', { class: 'lbl', text: 'Portföy değeri' }),
+      el('div', { class: 'toprow' }, [el('div', { class: 'lbl', text: 'Portföy değeri' }), has ? refresh : null]),
       el('div', { class: 'big num', text: has ? tl0(t.T) : '—' }),
-      el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, altinFiyat('gram') ? el('span', { class: 'chip plain', text: 'Gram altın ₺' + n2(altinFiyat('gram'), 0) }) : null, el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })])
+      has && (usd || gr) ? el('div', { class: 'esd' }, [usd ? el('span', { text: '≈ $' + n2(usd, 0) }) : null, gr ? el('span', { text: '≈ ' + n2(gr, gr < 10 ? 2 : 1) + ' gr altın' }) : null]) : null,
+      el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })]),
+      has ? el('div', { class: 'info' }, [guncelleniyor ? 'Fiyatlar güncelleniyor…' : (sg ? 'Güncellendi: ' + trTime(sg.zaman) : 'Henüz güncellenmedi') + (kurN ? ' · $1 = ₺' + n2(kurN, 2) : '') + (gram ? ' · Gram altın ₺' + n2(gram, 0) : '') + (sg && sg.eksik && sg.eksik.length ? ' · Fiyatı bulunamayan: ' + sg.eksik.join(', ') : '')]) : null
     ]);
     if (!has) return [hero, S.loaded ? onboarding() : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Defterin açılıyor' }), 'Kayıtların yükleniyor.'])), S.loaded ? connectCard() : null];
 
@@ -598,9 +660,7 @@ button { cursor: pointer; }
     } });
     const upd = iconBtn('refresh', 'Güncelle', 'ghost sm', async (e) => {
       const b = e.currentTarget; b.disabled = true; b.classList.add('spin');
-      const kk = await readOrtakKur(); b.disabled = false; b.classList.remove('spin');
-      if (kk) { S.ortakKur = kk; await applyKur(kk, false); }
-      else toast(S.db || STANDALONE ? 'Resmi kura şu an ulaşılamıyor; kuru elle girebilirsin.' : 'Resmi kur için claude.ai\'de oturum açık olmalı; şimdilik elle gir.');
+      await guncelleTumu(false); if (b.isConnected) { b.disabled = false; b.classList.remove('spin'); }
     }, { 'aria-label': 'Kuru TCMB\'den güncelle' });
     return card(null, el('div', { class: 'kurrow' }, [
       el('div', {}, [el('div', { style: 'font-weight:700', text: 'Dolar kuru' }), el('div', { class: 'small muted', text: 'ABD varlıklarını TL\'ye çevirir' })]),
@@ -613,10 +673,7 @@ button { cursor: pointer; }
     const a = S.ortakAltin;
     const upd = iconBtn('refresh', 'Güncelle', 'ghost sm', async (e) => {
       const b = e.currentTarget; b.disabled = true; b.classList.add('spin');
-      const aa = await readOrtak('altin'); b.disabled = false; b.classList.remove('spin');
-      if (!aa) { toast(S.db || STANDALONE ? 'Altın fiyatlarına şu an ulaşılamıyor.' : 'Canlı altın için claude.ai\'de oturum açık olmalı.'); return; }
-      S.ortakAltin = aa; const ch = await applyAltin(); render();
-      toast('Gram altın ' + tl0(aa.gram) + ' · ' + trTime(aa.zaman) + (ch ? ' · altınların güncellendi' : ''));
+      await guncelleTumu(false); if (b.isConnected) { b.disabled = false; b.classList.remove('spin'); }
     }, { 'aria-label': 'Altın fiyatlarını güncelle' });
     const head = el('div', { class: 'kurrow' }, [
       el('div', {}, [el('div', { style: 'font-weight:700', text: 'Altın fiyatları' }), el('div', { class: 'small muted', text: 'Serbest piyasa alış · fiziki altınların bu fiyatla değerlenir' })]),
@@ -819,7 +876,12 @@ button { cursor: pointer; }
     const delBtn = el('button', { type: 'button', class: 'btn danger', text: 'Varlığı sil', hidden: isNew ? 'hidden' : false, onclick: (e) => confirmInline(e.currentTarget, async () => {
       clearTimeout(timer); sh.close(); const k = savedKod; await commitPositions(S.p.pozisyonlar.filter(x => x.kod !== k), false); toast(k + ' silindi');
     }) });
-    const form = el('div', { class: 'fgrid', oninput: sched, onchange: (e) => { if (e.target === turSel) turTouched = true; if (e.target === grpSel || e.target === turSel) sync(); sched(); } }, [
+    const autoFiyat = () => {
+      const ko = document.getElementById('e-kod'), fi = document.getElementById('e-fiyat'); if (!ko || !fi || fi.readOnly) return;
+      const f = piyasaFiyat({ kod: ko.value, birim: birSel.value, grup: grpSel.value });
+      if (f && (!fi.value || fi.dataset.auto === '1')) { fi.value = n2(f, f < 10 ? 4 : 2); fi.dataset.auto = '1'; turNote.hidden = false; turNote.textContent = 'Güncel fiyat piyasadan otomatik alındı.'; }
+    };
+    const form = el('div', { class: 'fgrid', oninput: (e) => { if (e.target.id === 'e-fiyat') e.target.dataset.auto = ''; if (e.target.id === 'e-kod') autoFiyat(); sched(); }, onchange: (e) => { if (e.target === turSel) turTouched = true; if (e.target === grpSel || e.target === turSel) sync(); if (e.target === grpSel || e.target === birSel) autoFiyat(); sched(); } }, [
       inp('e-kod', 'Kod', d.kod, { type: 'text', autocapitalize: 'characters', readonly: isNew ? false : 'readonly' }),
       inp('e-ad', 'Ad', d.ad, { type: 'text' }),
       el('div', { class: 'field' }, [el('label', { for: 'e-grup', text: 'Grup' }), grpSel]),

@@ -1,5 +1,5 @@
 // Portföy Defteri: keeps the app usable offline. Prices are fetched fresh when online.
-const CACHE = 'portfoy-defteri-v2';
+const CACHE = 'portfoy-defteri-v3';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
