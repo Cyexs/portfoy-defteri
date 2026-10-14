@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15241F">
+<meta name="description" content="Midas portföyünü, aylık eklemelerini, altın ve dolar kurunu takip eden kişisel portföy defteri.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Portföy">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Portföy Defteri</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-column phone ledger, sticky total on top, four-tab bar at the bottom; widens to a centered 34rem column on desktop. */
+:root {
+  --bg: #EEF2EF;
+  --surface: #FFFFFF;
+  --surface-2: #E3E9E5;
+  --ink: #15241F;
+  --ink-2: #56655F;
+  --line: #D3DBD6;
+  --accent: #0D6E5A;
+  --accent-ink: #FFFFFF;
+  --c-kuresel: #2F66C9;
+  --c-bist: #C9533A;
+  --c-kira: #0D8A6E;
+  --c-altin: #B98A1F;
+  --good: #11795C;
+  --bad: #B83B2C;
+  --good-bg: #DDF0E8;
+  --bad-bg: #F6E1DD;
+  --shadow: 0 1px 2px rgba(21,36,31,.06), 0 6px 20px rgba(21,36,31,.06);
+  --f-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 14px;
+  --nav-h: 64px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0F1513; --surface: #18201D; --surface-2: #212B27; --ink: #E6EEEA; --ink-2: #9AA9A3; --line: #2B3632;
+  --accent: #3FBF9C; --accent-ink: #0B1210;
+  --c-kuresel: #6E9CF0; --c-bist: #EA7C62; --c-kira: #3FBF9C; --c-altin: #E0B547;
+  --good: #4CC79F; --bad: #EF7B6A; --good-bg: #173229; --bad-bg: #3A1F1B;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0F1513; --surface: #18201D; --surface-2: #212B27; --ink: #E6EEEA; --ink-2: #9AA9A3; --line: #2B3632;
+  --accent: #3FBF9C; --accent-ink: #0B1210;
+  --c-kuresel: #6E9CF0; --c-bist: #EA7C62; --c-kira: #3FBF9C; --c-altin: #E0B547;
+  --good: #4CC79F; --bad: #EF7B6A; --good-bg: #173229; --bad-bg: #3A1F1B;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark; }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+.app { max-width: 34rem; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px)); }
+
+/* Sticky top */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 14px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid transparent; }
+.top.scrolled { border-bottom-color: var(--line); }
+.brand { font-family: var(--f-display); font-size: 19px; letter-spacing: -0.01em; }
+.top-total { text-align: right; font-size: 13px; color: var(--ink-2); }
+.top-total b { display: block; color: var(--ink); font-family: var(--f-num); font-weight: 500; font-size: 15px; }
+
+.banner { background: var(--surface-2); color: var(--ink-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-block: 4px 12px; }
+
+.screen { display: grid; gap: 14px; }
+.card { background: var(--surface); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+.card h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); margin: 0 0 12px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+
+/* Hero */
+.hero { padding: 22px 20px 20px; background: var(--ink); color: var(--bg); border-radius: 18px; position: relative; overflow: hidden; }
+.hero .lbl { font-size: 13px; opacity: .72; }
+.hero .big { font-family: var(--f-display); font-size: clamp(34px, 10vw, 46px); line-height: 1.05; margin: 6px 0 12px; letter-spacing: -0.02em; }
+.hero .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; font-family: var(--f-num); }
+.chip.good { background: var(--good-bg); color: var(--good); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chip.plain { background: color-mix(in srgb, var(--bg) 16%, transparent); color: var(--bg); font-family: var(--f-body); font-weight: 500; }
+.hero .coin { position: absolute; right: -38px; top: -38px; width: 150px; height: 150px; border-radius: 50%; border: 22px solid color-mix(in srgb, var(--accent) 55%, transparent); opacity: .35; pointer-events: none; }
+
+/* Allocation */
+.alloc { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; }
+@media (max-width: 360px) { .alloc { grid-template-columns: 1fr; justify-items: center; } }
+.donut { width: 132px; height: 132px; display: block; }
+.legend { display: grid; gap: 10px; min-width: 0; width: 100%; }
+.lg { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.sw { width: 10px; height: 10px; border-radius: 3px; }
+.track { grid-column: 2 / 4; height: 6px; background: var(--surface-2); border-radius: 99px; position: relative; margin-top: -4px; }
+.track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
+.track .tg { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 2px; }
+
+/* Lists */
+.list { display: grid; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid var(--line); background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; width: 100%; }
+.item:first-child { border-top: 0; }
+.item .k { font-weight: 700; letter-spacing: .02em; }
+.item .sub { font-size: 12.5px; color: var(--ink-2); }
+.item .v { text-align: right; font-family: var(--f-num); font-size: 14px; }
+.item .p { text-align: right; font-family: var(--f-num); font-size: 12.5px; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.grp-h { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; margin-top: 4px; }
+.grp-h .sw { width: 8px; height: 8px; }
+.grp-h span:last-child { margin-left: auto; font-family: var(--f-num); font-weight: 500; color: var(--ink-2); font-size: 13px; }
+
+/* Buttons & forms */
+.btn { border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 700; background: var(--accent); color: var(--accent-ink); width: 100%; }
+.btn.ghost { background: var(--surface-2); color: var(--ink); }
+.btn.danger { background: var(--bad-bg); color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.field input, .field select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-family: var(--f-num); font-size: 16px; }
+.field select, .field input[type=text] { font-family: var(--f-body); }
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fgrid .full { grid-column: 1 / -1; }
+
+/* Plan */
+.amount { display: flex; align-items: baseline; gap: 8px; }
+.amount input { font-family: var(--f-display); font-size: 40px; width: 100%; border: 0; background: transparent; padding: 0; border-bottom: 2px solid var(--line); border-radius: 0; }
+.amount input:focus { outline: none; border-bottom-color: var(--accent); }
+.amount span { font-family: var(--f-display); font-size: 28px; color: var(--ink-2); }
+.split { display: grid; gap: 14px; }
+.sp { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+.sp .n { font-weight: 700; }
+.sp .t { font-family: var(--f-num); font-weight: 500; font-size: 17px; text-align: right; }
+.sp .h { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-2); }
+.sp .bar { grid-column: 1 / -1; height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.sp .bar i { display: block; height: 100%; border-radius: 99px; }
+.sp.zero .t { color: var(--ink-2); }
+.note { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+
+/* Charts */
+.chart { width: 100%; display: block; overflow: visible; }
+.chart text { font-family: var(--f-num); font-size: 10.5px; fill: var(--ink-2); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.stat .l { font-size: 12px; color: var(--ink-2); }
+.stat .x { font-family: var(--f-num); font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
+
+.empty { text-align: center; padding: 18px 8px; color: var(--ink-2); font-size: 14px; }
+.empty b { display: block; color: var(--ink); font-family: var(--f-display); font-weight: 400; font-size: 18px; margin-bottom: 4px; }
+
+/* Bottom nav */
+.nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.nav-in { max-width: 34rem; margin-inline: auto; display: grid; grid-template-columns: repeat(4, 1fr); height: var(--nav-h); }
+.nav button { border: 0; background: none; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.nav button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav button[aria-current="page"] { color: var(--accent); }
+
+/* Sheet */
+.scrim { position: fixed; inset: 0; z-index: 20; background: rgba(10,16,14,.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 34rem; border-radius: 20px 20px 0 0; padding: 18px max(18px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); display: grid; gap: 14px; max-height: 92%; overflow: auto; }
+.sheet h3 { font-family: var(--f-display); font-weight: 400; font-size: 22px; margin: 0; }
+.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: -6px auto 2px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .screen > * { animation: rise .35s cubic-bezier(.2,.7,.2,1) both; }
+  .screen > *:nth-child(2) { animation-delay: .04s; } .screen > *:nth-child(3) { animation-delay: .08s; } .screen > *:nth-child(4) { animation-delay: .12s; }
+  @keyframes rise { from { transform: translateY(6px); opacity: .6; } to { transform: none; opacity: 1; } }
+  .sheet { animation: up .25s cubic-bezier(.2,.7,.2,1); }
+  @keyframes up { from { transform: translateY(24px); } to { transform: none; } }
+}
+
+/* v2 additions */
+.kurrow { display: grid; grid-template-columns: 1fr auto; gap: 10px 12px; align-items: center; }
+.kurrow .src { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-2); }
+.kurctl { display: flex; gap: 8px; align-items: center; }
+.kurctl input { width: 7.5rem; padding: 10px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-family: var(--f-num); font-size: 16px; }
+.btn.sm { width: auto; padding: 10px 14px; font-size: 14px; border-radius: 10px; }
+.btn.icon { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.spin svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.status { font-size: 12.5px; color: var(--ink-2); min-height: 1.2em; text-align: center; }
+.status.ok { color: var(--good); }
+.chk { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
+.chk input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.imp-item { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+.imp-item:first-child { border-top: 0; }
+.imp-item input[type=checkbox] { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); }
+.imp-item .k { font-weight: 700; }
+.imp-item .sub { grid-column: 2 / 4; font-size: 12.5px; color: var(--ink-2); font-family: var(--f-num); }
+.tag { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.tag.new { background: var(--good-bg); color: var(--good); }
+.tag.miss { background: var(--bad-bg); color: var(--bad); }
+.dropzone { border: 1.5px dashed var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; text-align: center; background: var(--bg); }
+.dropzone.over { border-color: var(--accent); }
+.prog { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; display: flex; }
+.prog i { display: block; height: 100%; }
+.mode { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.mode svg { width: 20px; height: 20px; flex: none; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
+.onb { display: grid; gap: 12px; text-align: center; padding: 8px 4px 4px; }
+.onb b { font-family: var(--f-display); font-weight: 400; font-size: 20px; }
+.onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.warn { color: var(--bad); font-size: 12.5px; }
+</style>
+
+<div class="app">
+  <header class="top" id="top">
+    <div class="brand">Portföy Defteri</div>
+    <div class="top-total">Toplam<b id="topTotal">—</b></div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <main id="main"></main>
+</div>
+
+<nav class="nav" aria-label="Bölümler">
+  <div class="nav-in" id="nav">
+    <button data-tab="ozet" aria-current="page"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg>Özet</button>
+    <button data-tab="varlik"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Varlıklar</button>
+    <button data-tab="ay"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Bu ay</button>
+    <button data-tab="gecmis"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/></svg>Geçmiş</button>
+  </div>
+</nav>
+<input type="file" id="imgPick" accept="image/png,image/jpeg,image/webp" multiple hidden>
+<input type="file" id="jsonPick" accept="application/json,.json" hidden>
+
+<script>
+(() => {
+  const GR = [
+    { k: 'kuresel', n: 'Küresel ETF', c: '--c-kuresel', hint: 'VT veya VOO (kesirli pay)' },
+    { k: 'bist', n: 'BIST hisse', c: '--c-bist', hint: 'Mevcut hisseler veya aday listesi' },
+    { k: 'kira', n: 'Kira fonu', c: '--c-kira', hint: 'Tek fonda topla (ör. RBV)' },
+    { k: 'altin', n: 'Altın', c: '--c-altin', hint: 'KZL' }
+  ];
+  const GN = Object.fromEntries(GR.map(g => [g.k, g]));
+  const ALTIN = [
+    { k: 'gram', n: 'Gram altın', u: 'gram', kod: 'ALTIN-GRAM' },
+    { k: 'ceyrek', n: 'Çeyrek altın', u: 'adet', kod: 'ALTIN-CEYREK' },
+    { k: 'yarim', n: 'Yarım altın', u: 'adet', kod: 'ALTIN-YARIM' },
+    { k: 'tam', n: 'Tam altın', u: 'adet', kod: 'ALTIN-TAM' },
+    { k: 'cumhuriyet', n: 'Cumhuriyet altını', u: 'adet', kod: 'ALTIN-CUMHURIYET' }
+  ];
+  const AN = Object.fromEntries(ALTIN.map(a => [a.k, a]));
+  const altinFiyat = (k) => S.ortakAltin && Number(S.ortakAltin[k]) > 0 ? Number(S.ortakAltin[k]) : null;
+  const col = (k) => `var(${(GN[k] || GN.bist).c})`;
+  const ICON = {
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
+    image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z"/>',
+    phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+    down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+    up: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>'
+  };
+  const icon = (n) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[n]; return s; };
+
+  const STANDALONE = typeof window.claude === 'undefined';
+  const CANLI = STANDALONE ? 'Canlı fiyat dosyası' : 'Claude bağlantısı';
+  const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 2000, hedef: { kuresel: 30, bist: 30, kira: 30, altin: 10 }, pozisyonlar: [] });
+  const S = {
+    loaded: false, mode: 'yukleniyor', db: null, uid: null, sample: null, imgLim: null, dl: null, ortakKur: null, ortakAltin: null,
+    p: EMPTY(), ekl: [], gec: [], tab: 'ozet', calc: null
+  };
+  try { const t = localStorage.getItem('pd-tab'); if (t) S.tab = t; } catch (e) {}
+
+  /* ---------- format ---------- */
+  const tl0 = (v) => '₺' + Number(v || 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 });
+  const n2 = (v, d = 2) => Number(v || 0).toLocaleString('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const nAuto = (v) => Number(v).toLocaleString('tr-TR', { maximumFractionDigits: 6 });
+  const sgnTl = (v) => (v > 0.5 ? '+' : v < -0.5 ? '−' : '') + tl0(Math.abs(v));
+  const sgnPct = (v) => (v > 0.05 ? '+' : v < -0.05 ? '−' : '') + '%' + n2(Math.abs(v), 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const trDate = (s) => new Date(s + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const trShort = (s) => new Date(s + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  const trMonth = (ym) => new Date(ym + '-15T12:00:00').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+  const parseNum = (s) => { if (s == null) return NaN; s = String(s).trim().replace(/\s/g, ''); if (/,/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); };
+  const el = (tag, attrs = {}, kids = []) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === false || v == null) continue;
+      if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k === 'style') e.setAttribute('style', v);
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'checked') e.checked = !!v; else e.setAttribute(k, v);
+    }
+    for (const c of [].concat(kids)) if (c != null) e.append(c);
+    return e;
+  };
+  const svgEl = (tag, attrs = {}) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+
+  /* ---------- math ---------- */
+  const fx = (p) => p.birim === 'USD' ? S.p.kur : 1;
+  const val = (p) => Number(p.adet) * Number(p.fiyat) * fx(p);
+  const cost = (p) => Number(p.adet) * Number(p.maliyet) * fx(p);
+  function totals(list = S.p.pozisyonlar) {
+    const g = Object.fromEntries(GR.map(x => [x.k, 0])), gc = Object.fromEntries(GR.map(x => [x.k, 0]));
+    let T = 0, C = 0;
+    for (const p of list) { const v = val(p), c = cost(p); T += v; C += c; const k = g[p.grup] != null ? p.grup : 'bist'; g[k] += v; gc[k] += c; }
+    return { T, C, kz: T - C, kzp: C ? (T - C) / C * 100 : 0, g, gc };
+  }
+  function split(amount) {
+    const { T, g } = totals();
+    const tot = T + amount, h = S.p.hedef, hs = GR.reduce((s, x) => s + Number(h[x.k] || 0), 0) || 1;
+    const def = Object.fromEntries(GR.map(x => [x.k, Math.max(0, tot * (h[x.k] / hs) - g[x.k])]));
+    const sd = GR.reduce((s, x) => s + def[x.k], 0);
+    let out;
+    if (sd >= amount && sd > 0) out = Object.fromEntries(GR.map(x => [x.k, amount * def[x.k] / sd]));
+    else { const rem = amount - sd; out = Object.fromEntries(GR.map(x => [x.k, def[x.k] + rem * h[x.k] / hs])); }
+    const r = Object.fromEntries(GR.map(x => [x.k, Math.round(out[x.k] / 10) * 10]));
+    const diff = amount - GR.reduce((s, x) => s + r[x.k], 0);
+    const big = GR.reduce((a, x) => r[x.k] > r[a] ? x.k : a, GR[0].k); r[big] += diff;
+    return r;
+  }
+  const nextFirst = (from = new Date()) => new Date(from.getFullYear(), from.getMonth() + 1, 1, 12);
+  const thisMonth = () => ymd(new Date()).slice(0, 7);
+  const eklOf = (ym) => S.ekl.find(x => x.id === ym);
+
+  /* ---------- storage: cloud (db) or this device (localStorage) ---------- */
+  const LS = 'pd-v2';
+  let lsOk = true;
+  function lsSave() { try { localStorage.setItem(LS, JSON.stringify({ p: S.p, ekl: S.ekl, gec: S.gec })); lsOk = true; } catch (e) { lsOk = false; } }
+  function lsLoad() { try { const r = localStorage.getItem(LS); return r ? JSON.parse(r) : null; } catch (e) { lsOk = false; return null; } }
+  const portRef = () => S.db.doc('data/users/' + S.uid + '/portfoy');
+  const upsertLocal = (arr, id, data) => { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { id, ...data }; else arr.push({ id, ...data }); };
+
+  async function savePort() {
+    if (S.mode === 'bulut') { try { await portRef().set(clone(S.p)); return true; } catch (e) { toast('Kaydedilemedi. Bağlantını kontrol et.'); return false; } }
+    lsSave(); return true;
+  }
+  async function saveSub(sub, id, data) {
+    const arr = sub === 'eklemeler' ? S.ekl : S.gec;
+    upsertLocal(arr, id, data);
+    if (sub === 'gecmis') arr.sort((a, b) => a.tarih < b.tarih ? -1 : 1); else arr.sort((a, b) => a.id < b.id ? 1 : -1);
+    if (S.mode === 'bulut') { try { await portRef().collection(sub).doc(id).set(data); return true; } catch (e) { toast(e && e.code === 'quota_exceeded' ? 'Kayıt sınırı doldu.' : 'Kaydedilemedi. Tekrar dene.'); return false; } }
+    lsSave(); return true;
+  }
+  async function delSub(sub, id) {
+    const arr = sub === 'eklemeler' ? S.ekl : S.gec; const i = arr.findIndex(x => x.id === id); if (i >= 0) arr.splice(i, 1);
+    if (S.mode === 'bulut') { try { await portRef().collection(sub).doc(id).delete(); } catch (e) { toast('Silinemedi. Tekrar dene.'); } } else lsSave();
+    render();
+  }
+
+  /* Every change to positions goes through here: saves, logs the month's addition, snapshots today's value. */
+  async function commitPositions(newList, countAsAddition) {
+    const before = totals(S.p.pozisyonlar), after = totals(newList);
+    S.p.pozisyonlar = newList;
+    render();
+    const ok = await savePort();
+    if (!ok) return false;
+    if (countAsAddition) {
+      const dg = Object.fromEntries(GR.map(g => [g.k, Math.round((after.gc[g.k] - before.gc[g.k]) * 100) / 100]));
+      const delta = GR.reduce((s, g) => s + dg[g.k], 0);
+      if (Math.abs(delta) >= 0.01) {
+        const ym = thisMonth(), cur = eklOf(ym) || { ay: ym, tutar: 0, dagilim: {} };
+        const d = { ...(cur.dagilim || {}) }; for (const g of GR) d[g.k] = Math.round(((d[g.k] || 0) + dg[g.k]) * 100) / 100;
+        await saveSub('eklemeler', ym, { ay: ym, tutar: Math.round((Number(cur.tutar || 0) + delta) * 100) / 100, dagilim: d, son: ymd(new Date()) });
+      }
+    }
+    await snapshotToday();
+    render();
+    return true;
+  }
+  async function snapshotToday() {
+    if (!S.p.pozisyonlar.length) return;
+    const t = totals(), id = ymd(new Date());
+    await saveSub('gecmis', id, { tarih: id, deger_tl: Math.round(t.T * 100) / 100, maliyet_tl: Math.round(t.C * 100) / 100 });
+  }
+
+  /* ---------- official rate ---------- */
+  async function readOrtak(name) {
+    if (STANDALONE) {
+      try { const r = await fetch('fiyatlar.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); return j && j[name] ? j[name] : null; } } catch (e) {}
+      return null;
+    }
+    if (!S.db) return null;
+    try { const s = await S.db.doc('ortak/' + name).get(); return s.exists ? s.data() : null; } catch (e) { return null; }
+  }
+  const readOrtakKur = () => readOrtak('kur');
+  /* Physical gold positions follow the shared gold prices; repricing is a price update, never counted as a monthly addition. */
+  async function applyAltin() {
+    if (!S.ortakAltin) return false;
+    let changed = false;
+    const arr = S.p.pozisyonlar.map(p => {
+      const f = p.altinTur && altinFiyat(p.altinTur);
+      if (f && Number(p.fiyat) !== f) { changed = true; return { ...p, fiyat: f }; }
+      return p;
+    });
+    if (changed) await commitPositions(arr, false);
+    return changed;
+  }
+  const trTime = (iso) => { try { return new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+  async function applyKur(k, silent) {
+    if (!k || !(Number(k.usdtry) > 0)) return false;
+    const changed = S.p.kur !== Number(k.usdtry) || S.p.kurTarih !== k.tarih || S.p.kurKaynak !== 'TCMB';
+    S.p.kur = Number(k.usdtry); S.p.kurKaynak = 'TCMB'; S.p.kurTarih = k.tarih;
+    if (changed) { render(); await savePort(); if (S.p.pozisyonlar.some(p => p.birim === 'USD')) await snapshotToday(); }
+    if (!silent) toast('TCMB ' + trShort(k.tarih) + ' kuru: ' + n2(k.usdtry, 4));
+    render(); return true;
+  }
+
+  /* ---------- boot ---------- */
+  async function boot() {
+    render();
+    const cl = window.claude;
+    const use = (n) => cl && cl.use ? cl.use(n).catch(() => null) : Promise.resolve(null);
+    const [db, user, sample, dl] = await Promise.all([use('db'), use('user'), use('sample'), use('downloads')]);
+    S.dl = dl; S.sample = sample;
+    if (sample && sample.limits) { try { const l = await sample.limits(); S.imgLim = l && l.images ? l.images : null; } catch (e) { S.imgLim = null; } }
+    try { const perms = await use('permissions'); if (perms) S.sampleDenied = (await perms.state('sample')) === 'denied'; } catch (e) {}
+    S.db = db;
+    const uid = user ? await user.id() : null;
+    S.ortakKur = await readOrtakKur();
+    S.ortakAltin = await readOrtak('altin');
+
+    let cloud = false;
+    if (db && uid) {
+      S.uid = uid;
+      try {
+        const snap = await portRef().get();
+        if (snap.exists) cloud = true;
+        else {
+          const local = lsLoad();
+          const start = local && local.p ? local.p : EMPTY();
+          try { await portRef().set(clone(start)); cloud = true; if (local) { S.ekl = local.ekl || []; S.gec = local.gec || []; for (const e of S.ekl) await portRef().collection('eklemeler').doc(e.id).set(strip(e)); for (const g of S.gec) await portRef().collection('gecmis').doc(g.id).set(strip(g)); } }
+          catch (e) { cloud = false; }
+        }
+      } catch (e) { cloud = false; }
+    }
+
+    if (cloud) {
+      S.mode = 'bulut';
+      portRef().onSnapshot((snap) => {
+        if (snap.exists && !editing) { S.p = { ...EMPTY(), ...clone(snap.data()) }; }
+        S.loaded = true; render();
+      }, () => { showBanner('Veriler şu an yüklenemedi. Sayfayı yenilemeyi dene.'); });
+      portRef().collection('eklemeler').limit(240).onSnapshot((q) => { S.ekl = q.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => /^\d{4}-\d{2}$/.test(x.id)).sort((a, b) => a.id < b.id ? 1 : -1); render(); }, () => {});
+      portRef().collection('gecmis').orderBy('tarih', 'asc').limit(1000).onSnapshot((q) => { S.gec = q.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, () => {});
+      const first = await portRef().get().catch(() => null);
+      if (first && first.exists) S.p = { ...EMPTY(), ...clone(first.data()) };
+    } else {
+      S.mode = 'cihaz';
+      const local = lsLoad();
+      if (local) { S.p = { ...EMPTY(), ...local.p }; S.ekl = local.ekl || []; S.gec = local.gec || []; }
+      if (!lsOk) showBanner('Bu tarayıcı veri saklamaya izin vermiyor; değişiklikler sayfa kapanınca kaybolur. Yedek indirmeyi unutma.');
+    }
+    S.loaded = true;
+    if (S.ortakKur && S.p.kurKaynak !== 'elle' && S.ortakKur.tarih !== S.p.kurTarih) await applyKur(S.ortakKur, true);
+    else if (S.ortakKur && !S.p.pozisyonlar.length && S.p.kurKaynak === 'elle' && !S.p.kurTarih) await applyKur(S.ortakKur, true);
+    await applyAltin();
+    render();
+  }
+  const strip = (o) => { const c = { ...o }; delete c.id; return c; };
+
+  /* ---------- ui helpers ---------- */
+  function showBanner(t) { const b = document.getElementById('banner'); b.textContent = t; b.hidden = false; }
+  let tt;
+  function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const e = el('div', { class: 'toast', role: 'status', text: t }); document.body.append(e); clearTimeout(tt); tt = setTimeout(() => e.remove(), 2800); }
+  function card(title, kids, extra = '') { return el('section', { class: 'card ' + extra }, [title ? el('h2', { text: title }) : null, ...[].concat(kids)]); }
+  function kzChip(v, p) { return el('span', { class: 'chip ' + (v >= 0 ? 'good' : 'bad'), text: sgnTl(v) + ' · ' + sgnPct(p) }); }
+  const iconBtn = (name, text, cls, onclick, attrs = {}) => el('button', { class: 'btn icon ' + (cls || ''), type: 'button', onclick, ...attrs }, [icon(name), el('span', { text })]);
+  function confirmInline(btn, fn, label = 'Emin misin? Tekrar dokun') {
+    if (btn.dataset.armed) { fn(); return; }
+    btn.dataset.armed = '1'; const old = btn.innerHTML; btn.textContent = label;
+    setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.innerHTML = old; } }, 3000);
+  }
+
+  function donut(parts) {
+    const s = svgEl('svg', { viewBox: '0 0 120 120', class: 'donut', role: 'img', 'aria-label': 'Grup dağılımı' });
+    const R = 48, C = 2 * Math.PI * R; let off = 0;
+    s.append(svgEl('circle', { cx: 60, cy: 60, r: R, fill: 'none', stroke: 'var(--surface-2)', 'stroke-width': 18 }));
+    const tot = parts.reduce((a, p) => a + p.v, 0) || 1;
+    for (const p of parts) {
+      const len = p.v / tot * C; if (len <= 0) continue;
+      s.append(svgEl('circle', { cx: 60, cy: 60, r: R, fill: 'none', stroke: p.c, 'stroke-width': 18, 'stroke-dasharray': `${Math.max(0, len - 1.5)} ${C}`, 'stroke-dashoffset': -off, transform: 'rotate(-90 60 60)' }));
+      off += len;
+    }
+    return s;
+  }
+  function lineChart(series, labels, opts = {}) {
+    const W = 340, H = opts.h || 170, L = 46, Rr = 10, Tp = 10, B = 22, n = labels.length;
+    const s = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart', role: 'img', 'aria-label': opts.label || 'Grafik' });
+    const all = series.flatMap(x => x.v);
+    let lo = Math.min(...all), hi = Math.max(...all);
+    if (hi === lo) { hi = hi * 1.05 + 1; lo = lo * 0.95; }
+    const pd = (hi - lo) * 0.1; hi += pd; lo -= pd;
+    const x = (i) => n < 2 ? (L + W - Rr) / 2 : L + (W - Rr - L) * i / (n - 1);
+    const y = (v) => Tp + (H - B - Tp) * (1 - (v - lo) / (hi - lo));
+    for (let t = 0; t <= 3; t++) {
+      const v = lo + (hi - lo) * t / 3;
+      s.append(svgEl('line', { x1: L, x2: W - Rr, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 }));
+      const tx = svgEl('text', { x: L - 6, y: y(v) + 3.5, 'text-anchor': 'end' }); tx.textContent = opts.fmt ? opts.fmt(v) : Math.round(v); s.append(tx);
+    }
+    const step = Math.max(1, Math.ceil(n / 5));
+    labels.forEach((lb, i) => { if (i % step === 0 || i === n - 1) { if (i !== n - 1 && n - 1 - i < step / 2 && i !== 0) return; const tx = svgEl('text', { x: x(i), y: H - 6, 'text-anchor': n === 1 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle' }); tx.textContent = lb; s.append(tx); } });
+    series.forEach((se, si) => {
+      const d = se.v.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+      if (si === 0 && n > 1) {
+        const gid = 'g' + Math.random().toString(36).slice(2, 7);
+        const defs = svgEl('defs'); const lg = svgEl('linearGradient', { id: gid, x1: 0, x2: 0, y1: 0, y2: 1 });
+        lg.append(svgEl('stop', { offset: 0, 'stop-color': se.c, 'stop-opacity': .22 })); lg.append(svgEl('stop', { offset: 1, 'stop-color': se.c, 'stop-opacity': 0 }));
+        defs.append(lg); s.append(defs);
+        s.append(svgEl('path', { d: d + ` L${x(n - 1)} ${H - B} L${x(0)} ${H - B} Z`, fill: `url(#${gid})` }));
+      }
+      s.append(svgEl('path', { d, fill: 'none', stroke: se.c, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': se.dash || 'none' }));
+      s.append(svgEl('circle', { cx: x(n - 1), cy: y(se.v[n - 1]), r: 3.5, fill: se.c }));
+    });
+    return s;
+  }
+
+  /* ---------- screens ---------- */
+  function onboarding() {
+    const kids = [el('b', { text: 'Portföyünü ekleyerek başla' }), el('p', { text: 'Midas\'taki portföy ekranının görüntüsünü yükle; varlıkların otomatik okunsun. İstersen tek tek de ekleyebilirsin.' })];
+    if (!STANDALONE) kids.push(iconBtn('image', 'Ekran görüntüsü yükle', '', () => pickImages()));
+    kids.push(el('button', { class: 'btn ghost', type: 'button', text: 'Elle varlık ekle', onclick: () => editSheet(null) }));
+    return card(null, el('div', { class: 'onb' }, kids));
+  }
+
+  function scrOzet() {
+    const t = totals(), has = S.p.pozisyonlar.length > 0;
+    const nf = nextFirst(); const days = Math.ceil((nf - new Date()) / 864e5);
+    const hero = el('section', { class: 'hero' }, [
+      el('div', { class: 'coin' }),
+      el('div', { class: 'lbl', text: 'Portföy değeri' }),
+      el('div', { class: 'big num', text: has ? tl0(t.T) : '—' }),
+      el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, altinFiyat('gram') ? el('span', { class: 'chip plain', text: 'Gram altın ₺' + n2(altinFiyat('gram'), 0) }) : null, el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })])
+    ]);
+    if (!has) return [hero, S.loaded ? onboarding() : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Defterin açılıyor' }), 'Kayıtların yükleniyor.'])), S.loaded ? connectCard() : null];
+
+    const parts = GR.map(g => ({ v: t.g[g.k], c: col(g.k) }));
+    const legend = el('div', { class: 'legend' }, GR.map(g => {
+      const cur = t.T ? t.g[g.k] / t.T * 100 : 0, tgt = S.p.hedef[g.k] || 0;
+      return el('div', { class: 'lg' }, [
+        el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }),
+        el('span', { class: 'num small', text: '%' + n2(cur, 0) + ' / ' + tgt }),
+        el('div', { class: 'track' }, [el('i', { style: `width:${Math.min(100, cur)}%;background:${col(g.k)}` }), el('span', { class: 'tg', style: `left:calc(${tgt}% - 1px)` })])
+      ]);
+    }));
+    const alloc = card('Dağılım · şu an / hedef', [el('div', { class: 'alloc' }, [donut(parts), legend]), el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Çubuktaki koyu çizgi hedef oranı gösterir.' })]);
+
+    const rows = S.p.pozisyonlar.map(p => ({ p, kz: val(p) - cost(p) })).sort((a, b) => a.kz - b.kz);
+    const worst = rows.slice(0, 3).filter(r => r.kz < 0), best = rows.slice(-3).reverse().filter(r => r.kz > 0);
+    const mv = (r) => el('div', { class: 'item' }, [el('span', { class: 'k', text: r.p.kod }), el('span', { class: 'v ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnTl(r.kz) }), el('span', { class: 'sub', text: r.p.ad || (GN[r.p.grup] || GN.bist).n }), el('span', { class: 'p ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnPct(cost(r.p) ? r.kz / cost(r.p) * 100 : 0) })]);
+    const movers = (best.length || worst.length) ? card('En çok etkileyenler', el('div', { class: 'list' }, [...best.map(mv), ...worst.map(mv)])) : null;
+
+    let hist = null;
+    if (S.gec.length) {
+      const pts = S.gec.slice(-12);
+      hist = card('Değer geçmişi', [lineChart([{ v: pts.map(g => g.deger_tl), c: 'var(--accent)' }, { v: pts.map(g => g.maliyet_tl), c: 'var(--ink-2)', dash: '4 4' }], pts.map(g => trShort(g.tarih)), { fmt: v => Math.round(v / 1000) + 'B', h: 140, label: 'Değer geçmişi' }),
+        el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Düz çizgi değer, kesikli çizgi yatırdığın tutar.' })]);
+    }
+    return [hero, alloc, hist, movers];
+  }
+
+  function kurCard() {
+    const k = S.p;
+    const src = k.kurKaynak === 'TCMB' && k.kurTarih ? 'TCMB döviz alış · ' + trDate(k.kurTarih) : (k.kurKaynak === 'elle' ? 'Elle girildi' : '');
+    const inp = el('input', { id: 'kur', type: 'text', inputmode: 'decimal', value: n2(k.kur, 4), 'aria-label': 'USD/TRY kuru', onchange: async (e) => {
+      const v = parseNum(e.target.value); if (!(v > 0)) { e.target.value = n2(S.p.kur, 4); toast('Geçerli bir kur gir.'); return; }
+      S.p.kur = v; S.p.kurKaynak = 'elle'; S.p.kurTarih = ''; e.target.blur(); render(); await savePort(); await snapshotToday(); render(); toast('Kur kaydedildi');
+    } });
+    const upd = iconBtn('refresh', 'Güncelle', 'ghost sm', async (e) => {
+      const b = e.currentTarget; b.disabled = true; b.classList.add('spin');
+      const kk = await readOrtakKur(); b.disabled = false; b.classList.remove('spin');
+      if (kk) { S.ortakKur = kk; await applyKur(kk, false); }
+      else toast(S.db || STANDALONE ? 'Resmi kura şu an ulaşılamıyor; kuru elle girebilirsin.' : 'Resmi kur için claude.ai\'de oturum açık olmalı; şimdilik elle gir.');
+    }, { 'aria-label': 'Kuru TCMB\'den güncelle' });
+    return card(null, el('div', { class: 'kurrow' }, [
+      el('div', {}, [el('div', { style: 'font-weight:700', text: 'Dolar kuru' }), el('div', { class: 'small muted', text: 'ABD varlıklarını TL\'ye çevirir' })]),
+      el('div', { class: 'kurctl' }, [inp, upd]),
+      el('div', { class: 'src', text: src })
+    ]));
+  }
+
+  function altinCard() {
+    const a = S.ortakAltin;
+    const upd = iconBtn('refresh', 'Güncelle', 'ghost sm', async (e) => {
+      const b = e.currentTarget; b.disabled = true; b.classList.add('spin');
+      const aa = await readOrtak('altin'); b.disabled = false; b.classList.remove('spin');
+      if (!aa) { toast(S.db || STANDALONE ? 'Altın fiyatlarına şu an ulaşılamıyor.' : 'Canlı altın için claude.ai\'de oturum açık olmalı.'); return; }
+      S.ortakAltin = aa; const ch = await applyAltin(); render();
+      toast('Gram altın ' + tl0(aa.gram) + ' · ' + trTime(aa.zaman) + (ch ? ' · altınların güncellendi' : ''));
+    }, { 'aria-label': 'Altın fiyatlarını güncelle' });
+    const head = el('div', { class: 'kurrow' }, [
+      el('div', {}, [el('div', { style: 'font-weight:700', text: 'Altın fiyatları' }), el('div', { class: 'small muted', text: 'Serbest piyasa alış · fiziki altınların bu fiyatla değerlenir' })]),
+      el('div', { class: 'kurctl' }, [upd])
+    ]);
+    if (!a) return card(null, [head, el('p', { class: 'small muted', style: 'margin:10px 0 0', text: S.loaded ? (STANDALONE ? 'Canlı altın fiyatına şu an ulaşılamıyor; fiziki altının fiyatını şimdilik elle girebilirsin.' : 'Canlı altın fiyatı için Claude\'a bağlı olman gerekiyor; fiziki altının fiyatını şimdilik elle girebilirsin.') : 'Yükleniyor…' })]);
+    const rows = el('div', { class: 'list', style: 'margin-top:6px' }, ALTIN.map(x => el('div', { class: 'item', style: 'padding:9px 0' }, [
+      el('span', { text: x.n }), el('span', { class: 'v', text: altinFiyat(x.k) ? '₺' + n2(altinFiyat(x.k)) : '—' })
+    ])));
+    return card(null, [head, rows, el('div', { class: 'src small muted', style: 'margin-top:6px', text: (a.kaynak || 'Serbest piyasa') + ' · ' + trTime(a.zaman) })]);
+  }
+
+  function scrVarlik() {
+    if (!S.p.pozisyonlar.length) return [kurCard(), altinCard(), S.loaded ? onboarding() : null];
+    const t = totals();
+    const blocks = GR.map(g => {
+      const ps = S.p.pozisyonlar.filter(p => (GN[p.grup] ? p.grup : 'bist') === g.k).sort((a, b) => val(b) - val(a));
+      if (!ps.length) return null;
+      return el('div', {}, [
+        el('div', { class: 'grp-h' }, [el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }), el('span', { text: tl0(t.g[g.k]) })]),
+        el('div', { class: 'list' }, ps.map(p => {
+          const v = val(p), c = cost(p), k = v - c, kp = c ? k / c * 100 : 0, cur = p.birim === 'USD' ? '$' : '₺';
+          return el('button', { class: 'item', type: 'button', onclick: () => editSheet(p) }, [
+            el('span', { class: 'k', text: p.kod }), el('span', { class: 'v', text: tl0(v) }),
+            el('span', { class: 'sub num', text: p.altinTur && AN[p.altinTur] ? nAuto(p.adet) + ' ' + AN[p.altinTur].u + ' × ₺' + n2(p.fiyat) + ' · canlı' : nAuto(p.adet) + ' × ' + cur + n2(p.fiyat) }),
+            el('span', { class: 'p ' + (k >= 0 ? 'pos' : 'neg'), text: sgnPct(kp) })
+          ]);
+        }))
+      ]);
+    });
+    return [kurCard(), altinCard(), card('Varlıklar · ' + S.p.pozisyonlar.length, el('div', { style: 'display:grid;gap:16px' }, blocks)),
+      el('div', { class: 'btns' }, [STANDALONE ? null : iconBtn('image', 'Görüntüden', 'ghost', () => pickImages()), el('button', { class: 'btn ghost', type: 'button', style: STANDALONE ? 'grid-column:1/-1' : '', text: '+ Altın ekle', onclick: () => editSheet(null, { grup: 'altin', altinTur: 'gram' }) }),
+        el('button', { class: 'btn', type: 'button', text: '+ Varlık ekle', onclick: () => editSheet(null), style: 'grid-column:1/-1' })]),
+      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Bir varlığa dokun; değiştirdiğin her şey otomatik kaydedilir.' })];
+  }
+
+  function scrAy() {
+    const ym = thisMonth(), done = eklOf(ym), eklenen = Math.max(0, Number(done && done.tutar || 0)), aylik = Number(S.p.aylik || 0);
+    const kalan = Math.max(0, aylik - eklenen);
+    const pct = aylik ? Math.min(100, eklenen / aylik * 100) : 0;
+    const progBar = el('div', { class: 'prog', role: 'img', 'aria-label': '%' + Math.round(pct) + ' tamamlandı' }, GR.map(g => { const v = Math.max(0, Number(done && done.dagilim && done.dagilim[g.k] || 0)); return v > 0 && aylik ? el('i', { style: `width:${Math.min(100, v / aylik * 100)}%;background:${col(g.k)}` }) : null; }));
+    const progCard = card(trMonth(ym) + ' eklemesi', [
+      el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('span', { class: 'num', style: 'font-size:22px;font-family:var(--f-display)', text: tl0(eklenen) }), el('span', { class: 'muted small', text: '/ ' + tl0(aylik) })]),
+      progBar,
+      el('p', { class: 'small muted', style: 'margin:10px 0 0', text: eklenen > 0 ? 'Varlıklarda yaptığın alımlar buraya otomatik yazılıyor.' : 'Bu ay henüz alım yok. Varlıklarda adet eklediğinde burası kendiliğinden dolar.' })
+    ]);
+    if (S.calc == null) S.calc = kalan > 0 ? kalan : aylik;
+    const box = el('div', { class: 'split' });
+    const draw = () => {
+      const a = Math.max(0, Number(S.calc) || 0), r = split(a); box.textContent = '';
+      for (const g of GR) {
+        const v = r[g.k];
+        box.append(el('div', { class: 'sp' + (v <= 0 ? ' zero' : '') }, [el('span', { class: 'n', text: g.n }), el('span', { class: 't', text: tl0(v) }),
+          el('div', { class: 'bar' }, [el('i', { style: `width:${a ? Math.max(0, v) / a * 100 : 0}%;background:${col(g.k)}` })]),
+          el('span', { class: 'h', text: v > 0 ? g.hint : 'Bu sefer gerek yok, hedefin üstünde' })]));
+      }
+    };
+    draw();
+    const amountIn = el('div', { class: 'amount' }, [el('span', { text: '₺' }), el('input', { id: 'tutar', type: 'number', inputmode: 'numeric', step: '50', min: '0', value: S.calc, 'aria-label': 'Bölünecek tutar', oninput: (e) => { S.calc = e.target.value; draw(); } })]);
+    return [progCard,
+      card(kalan > 0 && eklenen > 0 ? 'Kalan tutarı nasıl bölmeli?' : 'Bu ayki tutarı nasıl bölmeli?', [amountIn, el('div', { style: 'height:14px' }), box,
+        el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Güncel değerlerine göre hedefin altında kalan gruplara öncelik verir.' })]),
+      card('Hedef oranlar', hedefForm())];
+  }
+
+  let hedefTimer;
+  function hedefForm() {
+    const f = el('div', { class: 'fgrid' }), msg = el('div', { class: 'small full', style: 'grid-column:1/-1' });
+    const showSum = () => { const s = GR.reduce((a, g) => a + (Number(document.getElementById('h-' + g.k)?.value) || 0), 0); msg.className = 'small ' + (s === 100 ? 'muted' : 'warn'); msg.textContent = s === 100 ? 'Toplam %100 · değişiklikler otomatik kaydedilir' : 'Toplam %' + s + ' · kaydetmek için %100 olmalı'; return s; };
+    const save = () => { clearTimeout(hedefTimer); hedefTimer = setTimeout(async () => {
+      const s = showSum(); const ay = Math.max(0, Number(document.getElementById('aylik').value) || 0);
+      const nh = {}; for (const g of GR) nh[g.k] = Math.max(0, Number(document.getElementById('h-' + g.k).value) || 0);
+      let changed = false;
+      if (s === 100 && JSON.stringify(nh) !== JSON.stringify(S.p.hedef)) { S.p.hedef = nh; changed = true; }
+      if (ay !== S.p.aylik) { S.p.aylik = ay; changed = true; }
+      if (changed && await savePort()) { msg.className = 'small muted'; msg.textContent = 'Kaydedildi'; }
+    }, 700); };
+    for (const g of GR) f.append(el('div', { class: 'field' }, [el('label', { for: 'h-' + g.k, text: g.n + ' (%)' }), el('input', { id: 'h-' + g.k, type: 'number', inputmode: 'numeric', min: 0, max: 100, value: S.p.hedef[g.k], oninput: () => { showSum(); save(); } })]));
+    f.append(el('div', { class: 'field', style: 'grid-column:1/-1' }, [el('label', { for: 'aylik', text: 'Aylık ekleme tutarı (₺)' }), el('input', { id: 'aylik', type: 'number', inputmode: 'numeric', min: 0, step: 50, value: S.p.aylik, oninput: save })]));
+    f.append(msg); setTimeout(showSum, 0);
+    return f;
+  }
+
+  function scrGecmis() {
+    const t = totals();
+    const totalEkl = S.ekl.reduce((s, x) => s + Math.max(0, Number(x.tutar || 0)), 0);
+    const stats = el('div', { class: 'stats' }, [
+      el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Toplam eklenen' }), el('div', { class: 'x', text: tl0(totalEkl) })]),
+      el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Ekleme yapılan ay' }), el('div', { class: 'x', text: String(S.ekl.filter(x => Number(x.tutar) > 0).length) })]),
+      el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Şu an K/Z' }), el('div', { class: 'x ' + (t.kz >= 0 ? 'pos' : 'neg'), text: S.p.pozisyonlar.length ? sgnTl(t.kz) : '—' })])
+    ]);
+    const g = S.gec;
+    const chart = g.length ? [lineChart([{ v: g.map(x => x.deger_tl), c: 'var(--accent)' }, { v: g.map(x => x.maliyet_tl), c: 'var(--ink-2)', dash: '4 4' }], g.map(x => trShort(x.tarih)), { fmt: v => Math.round(v / 1000) + 'B', label: 'Portföy değeri ve maliyet' }),
+      el('div', { class: 'row small', style: 'margin-top:8px' }, [el('span', { class: 'muted', text: 'Düz: değer · Kesikli: yatırılan' }), el('span', { class: 'muted', text: g.length + ' gün' })]),
+      el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Bir varlığı ya da kuru her güncellediğinde o günün değeri otomatik eklenir.' })]
+      : el('div', { class: 'empty' }, [el('b', { text: 'Henüz geçmiş yok' }), 'Varlıklarını güncelledikçe grafik kendiliğinden oluşur.']);
+    const list = S.ekl.length ? el('div', { class: 'list' }, S.ekl.map(x => el('div', { class: 'item' }, [
+      el('span', { class: 'k', text: trMonth(x.ay || x.id) }),
+      el('span', { class: 'v', text: tl0(Math.max(0, Number(x.tutar || 0))) }),
+      el('span', { class: 'sub', text: GR.filter(gg => x.dagilim && x.dagilim[gg.k] > 0.5).map(gg => gg.n + ' ' + tl0(x.dagilim[gg.k])).join(' · ') || '—' }),
+      el('button', { class: 'p muted', type: 'button', style: 'border:0;background:none;padding:0;text-decoration:underline', text: 'Sil', 'aria-label': trMonth(x.ay || x.id) + ' kaydını sil', onclick: (ev) => confirmInline(ev.currentTarget, () => delSub('eklemeler', x.id), 'Emin misin?') })
+    ]))) : el('div', { class: 'empty' }, [el('b', { text: 'Henüz ekleme yok' }), 'Varlıklarda adet artırdığında o ayın eklemesi otomatik kaydedilir.']);
+    return [card('Özet', stats), card('Değer geçmişi', chart), card('Aylık eklemeler', list), dataCard()];
+  }
+
+  function dataCard() {
+    const cloud = S.mode === 'bulut';
+    const modeLine = el('div', { class: 'mode' }, [icon(cloud ? 'cloud' : 'phone'), el('div', {}, [
+      el('div', { style: 'font-weight:700', text: cloud ? 'Hesabına kaydediliyor' : 'Bu cihazda kaydediliyor' }),
+      el('div', { class: 'muted', text: cloud ? 'Verilerin claude.ai hesabına bağlı ve sadece sana görünür. Hangi cihazdan açarsan aç aynı defteri görürsün.' : (STANDALONE ? 'Verilerin bu telefonda, uygulamanın içinde duruyor; başka kimse göremez.' : 'Verilerin bu telefonun tarayıcısında duruyor; başka kimse göremez.') + ' Tarayıcı verisini silersen ya da telefon değiştirirsen kaybolur, o yüzden ara ara yedek indir.' })
+    ])]);
+    const btns = el('div', { class: 'btns' }, [
+      STANDALONE ? iconBtn('down', 'Yedek indir', 'ghost', () => {
+        const blob = new Blob([JSON.stringify({ surum: 2, p: S.p, eklemeler: S.ekl, gecmis: S.gec }, null, 1)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'portfoy-defteri-' + ymd(new Date()) + '.json'; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Yedek indirildi');
+      }) : S.dl ? iconBtn('down', 'Yedek indir', 'ghost', async () => {
+        try { await S.dl.save({ filename: 'portfoy-defteri-' + ymd(new Date()) + '.json', data: JSON.stringify({ surum: 2, p: S.p, eklemeler: S.ekl, gecmis: S.gec }, null, 1) }); toast('Yedek indirildi'); }
+        catch (e) { if (e && e.code !== 'declined') toast('Yedek indirilemedi.'); }
+      }) : null,
+      iconBtn('up', 'Yedekten yükle', 'ghost', () => document.getElementById('jsonPick').click(), { style: S.dl || STANDALONE ? '' : 'grid-column:1/-1' })
+    ]);
+    return el('div', { style: 'display:grid;gap:14px' }, [card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns]), S.loaded ? connectCard() : null]);
+  }
+
+  /* ---------- edit sheet (autosave) ---------- */
+  let editing = false;
+  function openSheet(title, content, onClose) {
+    const sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, [el('div', { class: 'grab' }), el('h3', { text: title }), ...[].concat(content)]);
+    const scrim = el('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } }, sheet);
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    function close() { scrim.remove(); document.removeEventListener('keydown', onKey); if (onClose) onClose(); }
+    document.addEventListener('keydown', onKey);
+    document.querySelectorAll('.scrim').forEach(x => x.remove());
+    document.body.append(scrim);
+    return { close, sheet };
+  }
+
+  function editSheet(p, preset) {
+    const isNew = !p; let savedKod = p ? p.kod : null;
+    const d = p ? { ...p } : { kod: '', ad: '', grup: 'bist', adet: '', fiyat: '', maliyet: '', birim: 'TL', ...(preset || {}) };
+    if (isNew && d.altinTur && AN[d.altinTur]) { d.kod = AN[d.altinTur].kod; d.ad = AN[d.altinTur].n; if (altinFiyat(d.altinTur)) d.fiyat = altinFiyat(d.altinTur); }
+    const turSel = el('select', { id: 'e-tur' }, [el('option', { value: '', text: 'Altın fonu veya diğer (fiyatı elle)', selected: !d.altinTur ? 'selected' : false }), ...ALTIN.map(a => el('option', { value: a.k, selected: d.altinTur === a.k ? 'selected' : false, text: a.n + (altinFiyat(a.k) ? ' · canlı fiyat' : '') }))]);
+    const turField = el('div', { class: 'field full' }, [el('label', { for: 'e-tur', text: 'Altın türü' }), turSel]);
+    const turNote = el('div', { class: 'small muted full', style: 'grid-column:1/-1;margin-top:-4px' });
+    const status = el('div', { class: 'status', text: isNew ? 'Kod, adet, fiyat ve maliyeti girince otomatik kaydedilir.' : 'Değişiklikler otomatik kaydedilir.' });
+    const fv = (v) => v === '' || v == null ? '' : nAuto(v);
+    const inp = (id, label, value, extra = {}) => el('div', { class: 'field' + (extra.full ? ' full' : '') }, [el('label', { for: id, text: label }), el('input', { id, value, ...extra, full: null })]);
+    const grpSel = el('select', { id: 'e-grup' }, GR.map(g => el('option', { value: g.k, selected: d.grup === g.k ? 'selected' : false, text: g.n })));
+    const birSel = el('select', { id: 'e-birim' }, ['TL', 'USD'].map(b => el('option', { value: b, selected: d.birim === b ? 'selected' : false, text: b })));
+    const countBox = el('input', { type: 'checkbox', id: 'e-say', checked: true });
+    let timer, busy = false, again = false;
+    const read = () => {
+      const g = (id) => document.getElementById(id).value;
+      const np = { kod: g('e-kod').trim().toUpperCase(), ad: g('e-ad').trim(), grup: grpSel.value, birim: birSel.value, adet: parseNum(g('e-adet')), fiyat: parseNum(g('e-fiyat')), maliyet: parseNum(g('e-maliyet')) };
+      const tur = grpSel.value === 'altin' ? turSel.value : '';
+      if (tur) { np.altinTur = tur; np.birim = 'TL'; const f = altinFiyat(tur); if (f) np.fiyat = f; }
+      return np;
+    };
+    const sync = () => {
+      const isAl = grpSel.value === 'altin'; turField.hidden = !isAl;
+      const tur = isAl ? turSel.value : '', a = AN[tur], f = tur ? altinFiyat(tur) : null;
+      const fi = document.getElementById('e-fiyat'), ko = document.getElementById('e-kod'), ad = document.getElementById('e-ad');
+      if (!fi) return;
+      document.querySelector('label[for="e-adet"]').textContent = a ? (a.u === 'gram' ? 'Gram' : 'Adet') : 'Adet';
+      document.querySelector('label[for="e-maliyet"]').textContent = a ? 'Alış fiyatı (' + (a.u === 'gram' ? 'gram' : 'adet') + ' başına ₺)' : 'Ortalama maliyet';
+      if (a) {
+        birSel.value = 'TL'; birSel.disabled = true;
+        if (f) { fi.value = n2(f); fi.readOnly = true; turNote.textContent = 'Fiyat canlı piyasa fiyatından otomatik alınır ve güncellendikçe değişir.'; }
+        else { fi.readOnly = false; turNote.textContent = 'Canlı fiyat şu an yok; fiyatı elle gir.'; }
+        if (isNew && !savedKod && (!ko.value || ALTIN.some(x => x.kod === ko.value.trim().toUpperCase()))) { ko.value = a.kod; if (!ad.value || ALTIN.some(x => x.n === ad.value)) ad.value = a.n; }
+      } else { birSel.disabled = false; fi.readOnly = false; turNote.textContent = ''; }
+      turNote.hidden = !turNote.textContent;
+    };
+    async function doSave() {
+      if (busy) { again = true; return; }
+      const np = read();
+      if (!np.kod || !(np.adet >= 0) || !(np.fiyat >= 0) || !(np.maliyet >= 0)) { status.className = 'status'; status.textContent = 'Kaydetmek için kod, adet, fiyat ve maliyet gerekli.'; return; }
+      const arr = S.p.pozisyonlar.slice();
+      const i = savedKod ? arr.findIndex(x => x.kod === savedKod) : -1;
+      if (i < 0 && arr.some(x => x.kod === np.kod)) { status.className = 'status'; status.textContent = np.kod + ' zaten listede; listeden ona dokunup güncelle.'; return; }
+      if (i >= 0 && JSON.stringify(arr[i]) === JSON.stringify(np)) return;
+      if (i >= 0) arr[i] = np; else arr.push(np);
+      busy = true; status.className = 'status'; status.textContent = 'Kaydediliyor…';
+      const ok = await commitPositions(arr, countBox.checked);
+      busy = false;
+      if (ok) { savedKod = np.kod; document.getElementById('e-kod') && (document.getElementById('e-kod').readOnly = true); delBtn.hidden = false; status.className = 'status ok'; status.textContent = 'Kaydedildi'; }
+      if (again) { again = false; doSave(); }
+    }
+    const sched = () => { clearTimeout(timer); status.className = 'status'; status.textContent = '…'; timer = setTimeout(doSave, 700); };
+    const delBtn = el('button', { type: 'button', class: 'btn danger', text: 'Varlığı sil', hidden: isNew ? 'hidden' : false, onclick: (e) => confirmInline(e.currentTarget, async () => {
+      clearTimeout(timer); sh.close(); const k = savedKod; await commitPositions(S.p.pozisyonlar.filter(x => x.kod !== k), false); toast(k + ' silindi');
+    }) });
+    const form = el('div', { class: 'fgrid', oninput: sched, onchange: (e) => { if (e.target === grpSel || e.target === turSel) sync(); sched(); } }, [
+      inp('e-kod', 'Kod', d.kod, { type: 'text', autocapitalize: 'characters', readonly: isNew ? false : 'readonly' }),
+      inp('e-ad', 'Ad', d.ad, { type: 'text' }),
+      el('div', { class: 'field' }, [el('label', { for: 'e-grup', text: 'Grup' }), grpSel]),
+      el('div', { class: 'field' }, [el('label', { for: 'e-birim', text: 'Para birimi' }), birSel]),
+      turField, turNote,
+      inp('e-adet', 'Adet', fv(d.adet), { type: 'text', inputmode: 'decimal' }),
+      inp('e-fiyat', 'Güncel fiyat', fv(d.fiyat), { type: 'text', inputmode: 'decimal' }),
+      inp('e-maliyet', 'Ortalama maliyet', fv(d.maliyet), { type: 'text', inputmode: 'decimal', full: true }),
+      el('label', { class: 'chk full', for: 'e-say' }, [countBox, el('span', { text: 'Maliyetteki artışı bu ayın eklemesine say (yeni alım yaptıysan açık bırak; sadece düzeltme yapıyorsan kapat)' })])
+    ]);
+    const top = STANDALONE ? null : iconBtn('image', 'Ekran görüntüsünden doldur', 'ghost', () => { clearTimeout(timer); sh.close(); pickImages(); });
+    editing = true;
+    const sh = openSheet(isNew ? (d.altinTur ? 'Altın ekle' : 'Yeni varlık') : d.kod, [top, form, status, el('button', { type: 'button', class: 'btn', text: 'Bitti', onclick: async () => { clearTimeout(timer); await doSave(); sh.close(); } }), delBtn], () => { editing = false; clearTimeout(timer); render(); });
+    sync();
+    setTimeout(() => { const f = document.getElementById(isNew && !d.altinTur ? 'e-kod' : 'e-adet'); if (f) f.focus(); }, 60);
+  }
+
+  /* ---------- screenshot import ---------- */
+  function pickImages() {
+    if (!S.sample || S.sampleDenied) { connectSheet('Ekran görüntüsünü okumak için uygulamanın Claude\'u kullanmasına izin vermen gerekiyor.'); return; }
+    const f = document.getElementById('imgPick'); if (S.imgLim && S.imgLim.mediaTypes) f.accept = S.imgLim.mediaTypes.join(','); f.value = ''; f.click();
+  }
+
+  /* ---------- connect to Claude ---------- */
+  const connected = () => !!(S.uid && S.sample && !S.sampleDenied);
+  async function connectNow(btn) {
+    const cl = window.claude;
+    const perms = cl && cl.use ? await cl.use('permissions').catch(() => null) : null;
+    if (!cl || !perms) { toast('Önce claude.ai\'de oturum aç, sonra bu bağlantıyı yeniden aç.'); return; }
+    if (btn) btn.disabled = true;
+    let st = {};
+    try { st = await perms.request(['sample', 'db', 'user', 'downloads']); } catch (e) {}
+    if (btn) btn.disabled = false;
+    if (st.sample === 'denied') {
+      try { await perms.manage(); st.sample = await perms.state('sample'); } catch (e) { toast('Sayfanın İzinler menüsünden Claude erişimini açabilirsin.'); return; }
+    }
+    if (st.sample === 'granted' || st.sample === 'prompt' || st.db === 'granted') { toast('Bağlanıyor…'); setTimeout(() => location.reload(), 400); }
+    else toast('Bağlantı kurulamadı. claude.ai\'de oturum açık olduğundan emin ol.');
+  }
+  function connectBody(reason) {
+    const b = el('button', { class: 'btn', type: 'button' }, [el('span', { text: 'Claude ile bağla' })]);
+    b.addEventListener('click', () => connectNow(b));
+    return [
+      el('p', { style: 'margin:0', text: reason || 'Claude\'a bağlanınca ekran görüntülerinden portföyünü okuyabilir, resmi dolar kurunu otomatik alabilir ve (mümkünse) verilerini hesabında saklayabilirsin.' }),
+      b,
+      el('p', { class: 'small muted', style: 'margin:0' }, ['Oturumun kapalıysa önce ', el('a', { href: 'https://claude.ai/login', target: '_blank', rel: 'noopener', text: 'claude.ai\'de giriş yap' }), ', sonra bu sayfayı yeniden aç. Bağlantı ücretsizdir; görüntü okuma kendi Claude kullanım hakkından harcanır.'])
+    ];
+  }
+  function connectSheet(reason) { const sh = openSheet('Claude ile bağla', [...connectBody(reason), el('button', { class: 'btn ghost', type: 'button', text: 'Şimdi değil', onclick: () => sh.close() })]); }
+  function connectCard() { return STANDALONE || connected() ? null : card('Claude bağlantısı', connectBody()); }
+  document.getElementById('imgPick').addEventListener('change', (e) => { const files = Array.from(e.target.files || []); if (files.length) importImages(files.slice(0, (S.imgLim && S.imgLim.maxCount) || 4)); });
+
+  const PROMPT = `Bu görüntüler bir yatırım uygulamasının (çoğunlukla Midas) portföy ekranından. Görünen her varlığı oku.
+Sadece şu JSON'u döndür: {"varliklar":[{"kod":"THYAO","ad":"Türk Hava Yolları","grup":"bist","birim":"TL","adet":2,"fiyat":283.0,"maliyet":300.0}]}
+Kurallar:
+- Sayıları nokta ondalıklı JSON sayısı yaz. Ekranda Türkçe biçim olabilir: "1.234,56" = 1234.56, "0,2050" = 0.205.
+- "fiyat" birim fiyat (güncel), "maliyet" birim başına ortalama maliyettir. Toplam pozisyon tutarını fiyat yerine yazma.
+- "birim": ABD hisseleri ve ETF'ler (fiyat $ ile) için "USD", diğerleri "TL".
+- "grup": ABD hisse/ETF → "kuresel"; Borsa İstanbul hisseleri ve hisse senedi fonları → "bist"; kira sertifikası, para piyasası, borçlanma araçları fonları → "kira"; altın veya kıymetli maden fonları → "altin". Emin değilsen fon adına göre tahmin et.
+- Ekranda görünmeyen bir alanı uydurma; null yaz. Grup başlıklarını (ör. "ABD Hisseleri") varlık sayma.
+- Aynı kod birden fazla görüntüde varsa bir kez yaz.`;
+
+  async function importImages(files) {
+    let ctl = new AbortController();
+    const stat = el('div', { class: 'status', text: 'Ekran görüntüsü okunuyor… Bu 10–40 saniye sürebilir.' });
+    const sh = openSheet('Görüntüden okuma', [el('div', { class: 'dropzone' }, [icon('image'), el('div', { text: files.length + ' görüntü seçildi' }), stat]), el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => { ctl.abort(); sh.close(); } })]);
+    let res;
+    try { res = await S.sample.json(PROMPT, { images: files, signal: ctl.signal }); }
+    catch (e) {
+      if (e && e.code === 'cancelled') return;
+      let msg = { not_granted: 'Görüntü okuma için izin verilmedi.', rate_limited: 'Şu an çok fazla istek var; biraz sonra tekrar dene.', image_rejected: 'Bu görüntü okunamadı; başka bir ekran görüntüsü dene.', invalid_json: 'Görüntüden varlık listesi çıkarılamadı; daha net bir ekran görüntüsü dene.', session_expired: 'Oturumun kapanmış; claude.ai\'ye tekrar giriş yap.', images_unavailable: 'Bu görünümde görüntü okunamıyor.' }[e && e.code] || 'Okuma tamamlanamadı; tekrar dene.';
+      if (e && (e.code === 'not_granted' || e.code === 'session_expired')) { S.sampleDenied = true; sh.close(); render(); connectSheet(msg + ' Tekrar denemek için Claude ile bağla.'); return; }
+      if (e && e.code === 'images_unavailable') msg = 'Bu uygulama görünümünde görüntü gönderilemiyor. Sayfayı tarayıcıda (claude.ai) açıp tekrar dene.';
+      stat.textContent = msg; stat.className = 'status warn'; return;
+    }
+    const items = (res && Array.isArray(res.varliklar) ? res.varliklar : Array.isArray(res) ? res : []).map(x => ({
+      kod: String(x.kod || '').trim().toUpperCase(), ad: String(x.ad || '').trim(), grup: GN[x.grup] ? x.grup : 'bist', birim: x.birim === 'USD' ? 'USD' : 'TL',
+      adet: Number(x.adet), fiyat: Number(x.fiyat), maliyet: Number(x.maliyet)
+    })).filter(x => x.kod);
+    sh.close();
+    if (!items.length) { toast('Görüntüde varlık bulunamadı.'); return; }
+    reviewImport(items);
+  }
+
+  function reviewImport(items) {
+    const wasEmpty = !S.p.pozisyonlar.length;
+    const ok = (x) => x.adet >= 0 && x.fiyat >= 0 && x.maliyet >= 0 && [x.adet, x.fiyat, x.maliyet].every(Number.isFinite);
+    const boxes = [];
+    const rows = items.map((x, i) => {
+      const ex = S.p.pozisyonlar.find(p => p.kod === x.kod), good = ok(x);
+      const cb = el('input', { type: 'checkbox', id: 'imp-' + i, checked: good, disabled: good ? false : 'disabled', 'aria-label': x.kod + ' kaydet' }); boxes.push(cb);
+      const cur = x.birim === 'USD' ? '$' : '₺';
+      return el('label', { class: 'imp-item', for: 'imp-' + i }, [cb, el('span', { class: 'k', text: x.kod + (x.ad ? ' · ' + x.ad : '') }),
+        el('span', { class: 'tag ' + (!good ? 'miss' : ex ? '' : 'new'), text: !good ? 'Eksik bilgi' : ex ? 'Güncellenecek' : 'Yeni' }),
+        el('span', { class: 'sub', text: good ? nAuto(x.adet) + ' adet · fiyat ' + cur + n2(x.fiyat) + ' · maliyet ' + cur + n2(x.maliyet) + ' · ' + GN[x.grup].n : 'Okunamayan alanları sonra elle tamamlayabilirsin' })]);
+    });
+    const say = el('input', { type: 'checkbox', id: 'imp-say', checked: !wasEmpty });
+    const saveBtn = el('button', { class: 'btn', type: 'button', text: 'Seçilenleri kaydet', onclick: async () => {
+      const chosen = items.filter((x, i) => boxes[i].checked); if (!chosen.length) { toast('Kaydedilecek varlık seçmedin.'); return; }
+      saveBtn.disabled = true;
+      const arr = S.p.pozisyonlar.slice();
+      for (const x of chosen) { const i = arr.findIndex(p => p.kod === x.kod); const prev = i >= 0 ? arr[i] : null; const np = { ...x, ad: x.ad || (prev && prev.ad) || '' }; if (i >= 0) arr[i] = np; else arr.push(np); }
+      const done = await commitPositions(arr, say.checked);
+      sh.close(); if (done) toast(chosen.length + ' varlık kaydedildi');
+    } });
+    editing = true;
+    const sh = openSheet('Okunan varlıklar', [
+      el('p', { class: 'small muted', style: 'margin:0', text: 'Kontrol et; işaretli olanlar kaydedilecek. Aynı kodlu varlıklar güncellenir, diğerlerine dokunulmaz.' }),
+      el('div', {}, rows),
+      el('label', { class: 'chk', for: 'imp-say' }, [say, el('span', { text: wasEmpty ? 'Bu bir başlangıç kaydı; bu ayın eklemesine sayma (önerilen)' : 'Maliyetteki artışı bu ayın eklemesine say' })]),
+      saveBtn, el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ], () => { editing = false; render(); });
+    if (wasEmpty) { say.checked = false; say.nextSibling.textContent = 'Maliyeti bu ayın eklemesine say (ilk kurulumda kapalı bırak)'; }
+  }
+
+  /* ---------- backup restore ---------- */
+  document.getElementById('jsonPick').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    let data; try { data = JSON.parse(await f.text()); } catch (er) { toast('Bu dosya okunamadı.'); return; }
+    if (!data || !data.p || !Array.isArray(data.p.pozisyonlar)) { toast('Bu bir Portföy Defteri yedeği değil.'); return; }
+    const sh = openSheet('Yedeği yükle', [
+      el('p', { style: 'margin:0', text: data.p.pozisyonlar.length + ' varlık, ' + (data.eklemeler || []).length + ' aylık ekleme ve ' + (data.gecmis || []).length + ' günlük değer bulunuyor. Mevcut defterin bunlarla değiştirilecek.' }),
+      el('button', { class: 'btn', type: 'button', text: 'Yedeği yükle', onclick: async (ev) => {
+        ev.currentTarget.disabled = true;
+        S.p = { ...EMPTY(), ...data.p };
+        const oldE = S.ekl.map(x => x.id), oldG = S.gec.map(x => x.id);
+        if (S.mode === 'bulut') { for (const id of oldE) await portRef().collection('eklemeler').doc(id).delete().catch(() => {}); for (const id of oldG) await portRef().collection('gecmis').doc(id).delete().catch(() => {}); }
+        S.ekl = []; S.gec = [];
+        await savePort();
+        for (const x of data.eklemeler || []) if (x.id) await saveSub('eklemeler', x.id, strip(x));
+        for (const x of data.gecmis || []) if (x.id) await saveSub('gecmis', x.id, strip(x));
+        sh.close(); render(); toast('Yedek yüklendi');
+      } }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ]);
+  });
+
+  /* ---------- render ---------- */
+  function render() {
+    const main = document.getElementById('main');
+    const t = totals();
+    document.getElementById('topTotal').textContent = S.p.pozisyonlar.length ? tl0(t.T) : '—';
+    document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
+    const a = document.activeElement && document.activeElement.id;
+    if (a && (['tutar', 'kur', 'aylik'].includes(a) || /^h-/.test(a))) return;
+    main.textContent = '';
+    const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis }[S.tab] || scrOzet;
+    main.append(el('div', { class: 'screen' }, scr().filter(Boolean)));
+  }
+
+  document.getElementById('nav').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]'); if (!b) return;
+    S.tab = b.dataset.tab; S.calc = null; try { localStorage.setItem('pd-tab', S.tab); } catch (er) {}
+    if (document.activeElement) document.activeElement.blur();
+    render(); window.scrollTo({ top: 0 });
+  });
+  window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', window.scrollY > 4), { passive: true });
+
+  if (STANDALONE && 'serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); }
+  boot();
+})();
+</script>
+
+</body>
+</html>

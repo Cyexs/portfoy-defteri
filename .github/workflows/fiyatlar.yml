@@ -1,0 +1,35 @@
+name: Fiyatları güncelle
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # her saat başı +7 dk (UTC)
+  workflow_dispatch: {}    # Actions sekmesinden elle çalıştırmak için
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fiyatlar
+  cancel-in-progress: false
+
+jobs:
+  guncelle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fiyatları çek
+        run: python scripts/fiyat_guncelle.py
+      - name: Değiştiyse kaydet
+        run: |
+          if git diff --quiet -- fiyatlar.json; then
+            echo "Değişiklik yok"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+            git add fiyatlar.json
+            git commit -m "Fiyatlar güncellendi"
+            git push
+          fi
