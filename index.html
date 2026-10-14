@@ -577,7 +577,7 @@ button { cursor: pointer; }
 
     const rows = S.p.pozisyonlar.map(p => ({ p, kz: val(p) - cost(p) })).sort((a, b) => a.kz - b.kz);
     const worst = rows.slice(0, 3).filter(r => r.kz < 0), best = rows.slice(-3).reverse().filter(r => r.kz > 0);
-    const mv = (r) => el('div', { class: 'item' }, [el('span', { class: 'k', text: r.p.kod }), el('span', { class: 'v ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnTl(r.kz) }), el('span', { class: 'sub', text: r.p.ad || (GN[r.p.grup] || GN.bist).n }), el('span', { class: 'p ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnPct(cost(r.p) ? r.kz / cost(r.p) * 100 : 0) })]);
+    const mv = (r) => el('div', { class: 'item' }, [el('span', { class: 'k', text: r.p.altinTur && AN[r.p.altinTur] ? AN[r.p.altinTur].n : r.p.kod }), el('span', { class: 'v ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnTl(r.kz) }), el('span', { class: 'sub', text: r.p.ad || (GN[r.p.grup] || GN.bist).n }), el('span', { class: 'p ' + (r.kz >= 0 ? 'pos' : 'neg'), text: sgnPct(cost(r.p) ? r.kz / cost(r.p) * 100 : 0) })]);
     const movers = (best.length || worst.length) ? card('En çok etkileyenler', el('div', { class: 'list' }, [...best.map(mv), ...worst.map(mv)])) : null;
 
     let hist = null;
@@ -640,7 +640,7 @@ button { cursor: pointer; }
         el('div', { class: 'list' }, ps.map(p => {
           const v = val(p), c = cost(p), k = v - c, kp = c ? k / c * 100 : 0, cur = p.birim === 'USD' ? '$' : '₺';
           return el('button', { class: 'item', type: 'button', onclick: () => editSheet(p) }, [
-            el('span', { class: 'k', text: p.kod }), el('span', { class: 'v', text: tl0(v) }),
+            el('span', { class: 'k', text: p.altinTur && AN[p.altinTur] ? AN[p.altinTur].n : p.kod }), el('span', { class: 'v', text: tl0(v) }),
             el('span', { class: 'sub num', text: p.altinTur && AN[p.altinTur] ? nAuto(p.adet) + ' ' + AN[p.altinTur].u + ' × ₺' + n2(p.fiyat) + ' · canlı' : nAuto(p.adet) + ' × ' + cur + n2(p.fiyat) }),
             el('span', { class: 'p ' + (k >= 0 ? 'pos' : 'neg'), text: sgnPct(kp) })
           ]);
@@ -762,7 +762,9 @@ button { cursor: pointer; }
     const turSel = el('select', { id: 'e-tur' }, [el('option', { value: '', text: 'Altın fonu veya diğer (fiyatı elle)', selected: !d.altinTur ? 'selected' : false }), ...ALTIN.map(a => el('option', { value: a.k, selected: d.altinTur === a.k ? 'selected' : false, text: a.n + (altinFiyat(a.k) ? ' · canlı fiyat' : '') }))]);
     const turField = el('div', { class: 'field full' }, [el('label', { for: 'e-tur', text: 'Altın türü' }), turSel]);
     const turNote = el('div', { class: 'small muted full', style: 'grid-column:1/-1;margin-top:-4px' });
-    const status = el('div', { class: 'status', text: isNew ? 'Kod, adet, fiyat ve maliyeti girince otomatik kaydedilir.' : 'Değişiklikler otomatik kaydedilir.' });
+    const certNote = el('div', { class: 'note full', style: 'grid-column:1/-1', text: 'Altın sertifikası (ör. ALTIN.S1) borsada işlem görür; onu "Varlık ekle"den BIST hisse olarak gir.' });
+    const goldMode = !!d.altinTur;
+    const status = el('div', { class: 'status', text: isNew ? (d.altinTur ? 'Miktarı ve alış fiyatını girince otomatik kaydedilir.' : 'Kod, adet, fiyat ve maliyeti girince otomatik kaydedilir.') : 'Değişiklikler otomatik kaydedilir.' });
     const fv = (v) => v === '' || v == null ? '' : nAuto(v);
     const inp = (id, label, value, extra = {}) => el('div', { class: 'field' + (extra.full ? ' full' : '') }, [el('label', { for: id, text: label }), el('input', { id, value, ...extra, full: null })]);
     const grpSel = el('select', { id: 'e-grup' }, GR.map(g => el('option', { value: g.k, selected: d.grup === g.k ? 'selected' : false, text: g.n })));
@@ -790,14 +792,16 @@ button { cursor: pointer; }
         if (isNew && !savedKod && (!ko.value || ALTIN.some(x => x.kod === ko.value.trim().toUpperCase()))) { ko.value = a.kod; if (!ad.value || ALTIN.some(x => x.n === ad.value)) ad.value = a.n; }
       } else { birSel.disabled = false; fi.readOnly = false; turNote.textContent = ''; }
       turNote.hidden = !turNote.textContent;
+      certNote.hidden = !isAl || !!tur;
+      if (goldMode) certNote.hidden = false;
     };
     async function doSave() {
       if (busy) { again = true; return; }
       const np = read();
-      if (!np.kod || !(np.adet >= 0) || !(np.fiyat >= 0) || !(np.maliyet >= 0)) { status.className = 'status'; status.textContent = 'Kaydetmek için kod, adet, fiyat ve maliyet gerekli.'; return; }
+      if (!np.kod || !(np.adet >= 0) || !(np.fiyat >= 0) || !(np.maliyet >= 0)) { status.className = 'status'; status.textContent = goldMode ? 'Kaydetmek için miktar ve alış fiyatı gerekli.' : 'Kaydetmek için kod, adet, fiyat ve maliyet gerekli.'; return; }
       const arr = S.p.pozisyonlar.slice();
       const i = savedKod ? arr.findIndex(x => x.kod === savedKod) : -1;
-      if (i < 0 && arr.some(x => x.kod === np.kod)) { status.className = 'status'; status.textContent = np.kod + ' zaten listede; listeden ona dokunup güncelle.'; return; }
+      if (i < 0 && arr.some(x => x.kod === np.kod)) { status.className = 'status'; status.textContent = (np.altinTur && AN[np.altinTur] ? AN[np.altinTur].n + ' zaten listende' : np.kod + ' zaten listede') + '; listeden ona dokunup güncelle.'; return; }
       if (i >= 0 && JSON.stringify(arr[i]) === JSON.stringify(np)) return;
       if (i >= 0) arr[i] = np; else arr.push(np);
       busy = true; status.className = 'status'; status.textContent = 'Kaydediliyor…';
@@ -815,7 +819,7 @@ button { cursor: pointer; }
       inp('e-ad', 'Ad', d.ad, { type: 'text' }),
       el('div', { class: 'field' }, [el('label', { for: 'e-grup', text: 'Grup' }), grpSel]),
       el('div', { class: 'field' }, [el('label', { for: 'e-birim', text: 'Para birimi' }), birSel]),
-      turField, turNote,
+      turField, turNote, certNote,
       inp('e-adet', 'Adet', fv(d.adet), { type: 'text', inputmode: 'decimal' }),
       inp('e-fiyat', 'Güncel fiyat', fv(d.fiyat), { type: 'text', inputmode: 'decimal' }),
       inp('e-maliyet', 'Ortalama maliyet', fv(d.maliyet), { type: 'text', inputmode: 'decimal', full: true }),
@@ -823,7 +827,12 @@ button { cursor: pointer; }
     ]);
     const top = STANDALONE ? null : iconBtn('image', 'Ekran görüntüsünden doldur', 'ghost', () => { clearTimeout(timer); sh.close(); pickImages(); });
     editing = true;
-    const sh = openSheet(isNew ? (d.altinTur ? 'Altın ekle' : 'Yeni varlık') : d.kod, [top, form, status, el('button', { type: 'button', class: 'btn', text: 'Bitti', onclick: async () => { clearTimeout(timer); await doSave(); sh.close(); } }), delBtn], () => { editing = false; clearTimeout(timer); render(); });
+    const sh = openSheet(isNew ? (d.altinTur ? 'Altın ekle' : 'Yeni varlık') : (d.altinTur && AN[d.altinTur] ? AN[d.altinTur].n : d.kod), [top, form, status, el('button', { type: 'button', class: 'btn', text: 'Bitti', onclick: async () => { clearTimeout(timer); await doSave(); sh.close(); } }), delBtn], () => { editing = false; clearTimeout(timer); render(); });
+    if (goldMode) {
+      // Physical gold: no code, name, group or currency to fill; the type says it all.
+      for (const id of ['e-kod', 'e-ad', 'e-grup', 'e-birim']) { const f = document.getElementById(id); if (f) f.closest('.field').hidden = true; }
+      const tl = turField.querySelector('label'); if (tl) tl.textContent = 'Altın';
+    }
     sync();
     setTimeout(() => { const f = document.getElementById(isNew && !d.altinTur ? 'e-kod' : 'e-adet'); if (f) f.focus(); }, 60);
   }
