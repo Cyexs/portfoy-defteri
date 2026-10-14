@@ -1,4 +1,17 @@
 {
- "kur": {"usdtry": 49.2794, "kaynak": "TCMB döviz alış", "tarih": "2026-10-13"},
- "altin": {"gram": 6644.43, "ceyrek": 10631.08, "yarim": 21195.72, "tam": 43206.0, "cumhuriyet": 42524.33, "ons_usd": 4187.34, "kaynak": "Bloomberg HT serbest piyasa (alış)", "zaman": "2026-10-14T12:51+03:00"}
+ "kur": {
+  "usdtry": 49.2794,
+  "kaynak": "TCMB döviz alış",
+  "tarih": "2026-10-13"
+ },
+ "altin": {
+  "gram": 6566.58,
+  "ons_usd": 4144.6,
+  "ceyrek": 10506.52,
+  "yarim": 20947.38,
+  "tam": 42702.46,
+  "cumhuriyet": 42026.1,
+  "kaynak": "Ons altın × TCMB kuru (yaklaşık)",
+  "zaman": "2026-10-14T13:16+03:00"
+ }
 }
