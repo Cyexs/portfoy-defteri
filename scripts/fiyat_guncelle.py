@@ -8,6 +8,7 @@ Her çalıştığında fiyatlar.json dosyasını yeniler:
             TEFAS yatırım fonlarının son fiyatları (tefas.gov.tr).
 Bir kaynağa ulaşılamazsa o bölümün önceki değeri korunur. Sadece Python standart kütüphanesi kullanılır.
 """
+import http.cookiejar
 import json
 import urllib.parse
 import urllib.request
@@ -71,16 +72,29 @@ def tradingview(pazar, adet, siralama):
 
 
 def tefas():
+    # TEFAS önce sayfayı ziyaret edip oturum çerezi almayı bekliyor.
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    def ac(url, data=None, headers=None):
+        h = {"User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9"}
+        h.update(headers or {})
+        with opener.open(urllib.request.Request(url, data=data, headers=h), timeout=40) as r:
+            return r.read()
+    ac("https://www.tefas.gov.tr/TarihselVeriler.aspx")
     bugun = datetime.now(TR).date()
     for geri in range(0, 8):
         g = bugun - timedelta(days=geri)
         tarih = g.strftime("%d.%m.%Y")
         form = urllib.parse.urlencode({"fontip": "YAT", "sfontur": "", "fonkod": "", "fongrup": "", "bastarih": tarih,
                                        "bittarih": tarih, "fonturkod": "", "fonunvantip": "", "kurucukod": ""}).encode()
-        ham = getir("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", form, {
+        ham = ac("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", form, {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest",
             "Origin": "https://www.tefas.gov.tr", "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx"})
-        veri = json.loads(ham).get("data") or []
+        try:
+            veri = json.loads(ham).get("data") or []
+        except ValueError:
+            raise ValueError("TEFAS JSON yerine şunu döndürdü: " + ham[:120].decode("utf-8", "replace"))
         fiyatlar = {}
         for s in veri:
             kod, fiyat = s.get("FONKODU"), s.get("FIYAT")
@@ -121,6 +135,7 @@ def main():
     except Exception as e:
         print("Altın okunamadı, önceki fiyatlar korunuyor:", e)
 
+    hatalar = {}
     piyasa = dict(eski.get("piyasa") or {})
     for anahtar, is_ in (("bist", lambda: tradingview("turkey", 1500, "market_cap_basic")),
                          ("abd", lambda: tradingview("america", 3000, "Value.Traded"))):
@@ -130,6 +145,7 @@ def main():
             print(anahtar, len(piyasa[anahtar]), "fiyat")
         except Exception as e:
             print(anahtar, "okunamadı, önceki fiyatlar korunuyor:", e)
+            hatalar[anahtar] = str(e)[:200]
     try:
         fon, fon_tarih = tefas()
         piyasa["fon"] = fon
@@ -137,10 +153,12 @@ def main():
         print("fon", len(fon), "fiyat,", fon_tarih)
     except Exception as e:
         print("TEFAS okunamadı, önceki fiyatlar korunuyor:", e)
+        hatalar["fon"] = (type(e).__name__ + ": " + str(e))[:200]
     piyasa["kaynak"] = {"bist": "TradingView (15 dk gecikmeli)", "abd": "TradingView", "fon": "TEFAS"}
     yeni["piyasa"] = piyasa
+    yeni["hatalar"] = hatalar
 
-    karsilastir = lambda d: json.dumps({k: {kk: vv for kk, vv in (v or {}).items() if "aman" not in kk} for k, v in d.items() if k in ("kur", "altin", "piyasa")}, sort_keys=True)
+    karsilastir = lambda d: json.dumps({k: {kk: vv for kk, vv in (v or {}).items() if "aman" not in kk} for k, v in d.items() if k in ("kur", "altin", "piyasa", "hatalar")}, sort_keys=True)
     if karsilastir(yeni) == karsilastir(eski):
         print("Değişiklik yok.")
         return
