@@ -284,6 +284,27 @@ button { cursor: pointer; }
 .onb b { font-family: var(--f-display); font-weight: 400; font-size: 20px; }
 .onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .warn { color: var(--bad); font-size: 12.5px; }
+/* v6: launch consent, legal texts */
+.onay { display: grid; gap: 16px; padding-block: 20px 32px; }
+.onay h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 7.5vw, 34px); line-height: 1.12; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+.onay .lead { color: var(--ink-2); font-size: 15px; margin: 0; }
+.beyan { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 16px 18px; display: grid; gap: 6px; border-left: 4px solid var(--c-altin); }
+.beyan .eb { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
+.beyan p { margin: 0; font-size: 15px; line-height: 1.55; }
+.onaylar { display: grid; gap: 4px; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px 18px; }
+.onaylar .chk { padding: 12px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+.onaylar .chk:first-child { border-top: 0; }
+.onaylar .chk .opt { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); margin-left: 4px; }
+.lnk { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; font-size: inherit; display: inline; }
+.doclist { display: grid; }
+.doclist button { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; font-weight: 600; width: 100%; }
+.doclist button:first-child { border-top: 0; }
+.doclist button span:last-child { color: var(--ink-2); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+.yasal { display: grid; gap: 14px; font-size: 14.5px; line-height: 1.6; }
+.yasal h4 { margin: 4px 0 0; font-size: 15px; }
+.yasal p { margin: 0; }
+.yasal ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.yasal .meta { font-size: 12.5px; color: var(--ink-2); }
 </style>
 
 <div class="app">
@@ -865,7 +886,7 @@ button { cursor: pointer; }
       iconBtn('up', 'Yedekten yükle', 'ghost', () => document.getElementById('jsonPick').click(), { style: S.dl || STANDALONE ? '' : 'grid-column:1/-1' })
     ]);
     const cikis = el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', style: 'margin-top:10px', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } });
-    return el('div', { style: 'display:grid;gap:14px' }, [card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, (STANDALONE || S.mode !== 'bulut') ? cikis : null]), S.loaded ? connectCard() : null]);
+    return el('div', { style: 'display:grid;gap:14px' }, [card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, (STANDALONE || S.mode !== 'bulut') ? cikis : null]), yasalCard(), S.loaded ? connectCard() : null]);
   }
 
   /* ---------- edit sheet (autosave) ---------- */
@@ -975,6 +996,7 @@ button { cursor: pointer; }
 
   /* ---------- screenshot import ---------- */
   function pickImages() {
+    if (!S.riza) { rizaIste(pickImages); return; }
     if (!S.sample || S.sampleDenied) { connectSheet('Ekran görüntüsünü okumak için uygulamanın Claude\'u kullanmasına izin vermen gerekiyor.'); return; }
     const f = document.getElementById('imgPick'); if (S.imgLim && S.imgLim.mediaTypes) f.accept = S.imgLim.mediaTypes.join(','); f.value = ''; f.click();
   }
@@ -982,6 +1004,7 @@ button { cursor: pointer; }
   /* ---------- connect to Claude ---------- */
   const connected = () => !!(S.uid && S.sample && !S.sampleDenied);
   async function connectNow(btn) {
+    if (!S.riza) { rizaIste(() => connectNow(btn)); return; }
     const cl = window.claude;
     const perms = cl && cl.use ? await cl.use('permissions').catch(() => null) : null;
     if (!cl || !perms) { toast('Önce claude.ai\'de oturum aç, sonra bu bağlantıyı yeniden aç.'); return; }
@@ -1103,6 +1126,7 @@ Kurallar:
     mark.innerHTML = '<svg viewBox="0 0 24 24"><rect x="4" y="14" width="3" height="6" rx="1.2" fill="#2F66C9"/><rect x="8.6" y="11" width="3" height="9" rx="1.2" fill="#C9533A"/><rect x="13.2" y="8" width="3" height="12" rx="1.2" fill="#0D8A6E"/><rect x="17.8" y="5" width="3" height="15" rx="1.2" fill="#B98A1F"/><circle cx="7" cy="7" r="2.6" fill="none" stroke="#3FBF9C" stroke-width="1.6"/></svg>';
     const claudeBtn = el('button', { class: 'btn', type: 'button', text: STANDALONE ? 'Claude ile giriş yap' : 'Claude ile bağla' });
     claudeBtn.addEventListener('click', () => {
+      if (!S.riza) { rizaIste(() => claudeBtn.click()); return; }
       if (STANDALONE) { setGiris('claude'); const a = el('a', { href: CLAUDE_URL, target: '_blank', rel: 'noopener' }); document.body.append(a); a.click(); a.remove(); render(); }
       else connectNow(claudeBtn);
     });
@@ -1114,7 +1138,7 @@ Kurallar:
       el('div', { class: 'door primary' }, [el('b', { text: 'claude.ai hesabınla' }), el('ul', {}, [el('li', { text: 'Claude portföyünü yorumlar, neler ekleyebileceğini anlatır' }), el('li', { text: 'Ekran görüntüsünden varlıklarını okur' }), el('li', { text: 'Verilerin hesabında saklanır (mümkünse)' })]), claudeBtn,
         el('p', { class: 'fine', style: 'text-align:left' }, ['Hesabın yoksa ', el('a', { href: 'https://claude.ai/login', target: '_blank', rel: 'noopener', text: 'claude.ai\'de ücretsiz oluştur' }), '. Yorumlar kendi Claude kullanım hakkından harcanır.'])]),
       el('div', { class: 'door' }, [el('b', { text: 'Hesapsız' }), el('ul', {}, [el('li', { text: 'Tüm takip özellikleri, canlı kur ve altın' }), el('li', { text: 'Verilerin sadece bu telefonda kalır' })]), devamBtn]),
-      el('p', { class: 'fine', text: 'Yatırım tavsiyesi değildir; kararlar sana aittir.' })
+      el('p', { class: 'fine' }, ['Yatırım tavsiyesi değildir; kararlar sana aittir. ', lnk('sartlar'), ' · ', lnk('kvkk', 'KVKK')])
     ])];
   }
 
@@ -1159,6 +1183,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   async function yorumla(soru) {
     if (AI.busy) return;
     if (!S.p.pozisyonlar.length) { toast('Önce varlıklarını ekle.'); return; }
+    if (!S.riza) { rizaIste(() => yorumla(soru)); return; }
     AI.busy = true; AI.err = ''; AI.text = ''; AI.soru = soru || ''; AI.ctl = new AbortController(); render();
     const input = AI_TALIMAT + (soru ? '\n\nKişinin sorusu (önce buna odaklan, sonra kısaca diğer bölümlere değin; toplam 300 kelimeyi geçme): ' + soru : '') + '\n\nPORTFÖY:\n' + portfoyOzeti();
     try {
@@ -1303,6 +1328,206 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Haberler Midas\'tan, değişimler TradingView\'den (BIST 15 dk gecikmeli). Habere dokununca Midas\'ta açılır.' })];
   }
 
+  /* ---------- launch consent and legal texts ----------
+     Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
+     The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
+  const YASAL_SURUM = '14 Ekim 2026';
+  const SORUMLU = 'Portföy Defteri geliştiricisi';
+  const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
+  S.onay = false; S.riza = false;
+  const OK = { risk: false, sart: false, kvkk: false, riza: false };
+  const onayKaydi = () => { try { return JSON.parse(localStorage.getItem('pd-onay') || 'null'); } catch (e) { return null; } };
+  const onayYaz = () => { try { localStorage.setItem('pd-onay', JSON.stringify({ zaman: new Date().toISOString(), surum: YASAL_SURUM, riza: S.riza })); } catch (e) {} };
+  const RISK_BEYAN = 'Buradaki önerilerin yatırım tavsiyesi olmadığını, yapay zekâ ve otomatik kriterlerle oluşturulmuş öneriler olduğunu biliyorum. Yapacağım her türlü yatırımda riskin tamamen şahsıma ait olduğunu kabul ediyorum.';
+  const SPK_NOTU = 'Burada yer alan yatırım bilgi, yorum ve tavsiyeleri yatırım danışmanlığı kapsamında değildir. Yatırım danışmanlığı hizmeti; aracı kurumlar, portföy yönetim şirketleri, mevduat kabul etmeyen bankalar ile müşteri arasında imzalanacak yatırım danışmanlığı sözleşmesi çerçevesinde sunulmaktadır. Burada yer alan yorum ve tavsiyeler, yorum ve tavsiyede bulunanların kişisel görüşlerine dayanmaktadır. Bu görüşler mali durumunuz ile risk ve getiri tercihlerinize uygun olmayabilir. Bu nedenle, sadece burada yer alan bilgilere dayanılarak yatırım kararı verilmesi beklentilerinize uygun sonuçlar doğurmayabilir.';
+
+  const DOCS = {
+    risk: { t: 'Risk Bildirimi', b: [
+      ['p', 'Portföy Defteri bir kayıt ve takip aracıdır. İçindeki listeler, yorumlar ve öneriler yatırım tavsiyesi değildir.'],
+      ['h', 'Yatırım danışmanlığı değildir'], ['p', SPK_NOTU],
+      ['p', 'Uygulamanın geliştiricisi Sermaye Piyasası Kurulu\'ndan (SPK) izin almış bir kurum değildir ve yatırım danışmanlığı ya da portföy yönetimi hizmeti vermez.'],
+      ['h', 'Öneriler nasıl oluşuyor?'],
+      ['ul', [
+        '"İncelemeye değer" listeleri F/K, özsermaye kârlılığı (ROE) ve geçmiş getiri gibi sabit kriterlerle otomatik süzülür. Senin mali durumuna, hedefine ya da risk tercihine göre kişiselleştirilmez.',
+        'Claude yorumları Anthropic\'in yapay zekâ modeli tarafından üretilir. Yapay zekâ hatalı, eksik ya da güncel olmayan bilgi verebilir, var olmayan bir rakam uydurabilir.',
+        'Aylık bölüşüm hesabı yalnızca senin girdiğin hedef oranları uygulayan bir hesap makinesidir.'
+      ]],
+      ['h', 'Yatırımın riskleri'],
+      ['ul', [
+        'Hisse, fon, altın ve döviz değer kaybedebilir; yatırdığın paranın bir kısmını ya da tamamını kaybedebilirsin.',
+        'Geçmiş getiri gelecekteki getiriyi göstermez.',
+        'Fiyatlar üçüncü taraf kaynaklardan otomatik çekilir; BIST fiyatları 15 dakika gecikmelidir, fon fiyatları günde bir kez güncellenir, kesinti ya da hata olabilir. Kesin değer için aracı kurumuna bak.',
+        'Komisyon, vergi, stopaj ve alış-satış farkı hesaplara dahil değildir.'
+      ]],
+      ['h', 'Karar senin'], ['p', 'Herhangi bir işlem yapmadan önce bilgileri kendin doğrula, gerekirse yetkili bir yatırım danışmanına başvur. Verdiğin her yatırım kararı ve bunun sonuçları tamamen sana aittir.']
+    ] },
+    sartlar: { t: 'Kullanım Şartları', b: [
+      ['h', '1. Kapsam'],
+      ['p', 'Bu şartlar, Portföy Defteri web uygulamasını ("Uygulama") kullanan kişi ("Kullanıcı") ile Uygulamayı ücretsiz olarak geliştiren ve sunan kişi ("Geliştirici") arasındaki kullanım koşullarını düzenler. Açılış ekranındaki kutuyu işaretleyerek bu şartları kabul etmiş olursun. Kabul etmiyorsan Uygulamayı kullanma.'],
+      ['h', '2. Uygulama ne yapar, ne yapmaz'],
+      ['ul', [
+        'Girdiğin varlıkları, aylık eklemeleri ve değer geçmişini kaydeder; güncel fiyatlarla toplam değeri hesaplar.',
+        'Midas\'a, herhangi bir aracı kuruma ya da bankaya bağlanmaz. Alım-satım emri iletmez, para transferi yapmaz, hesap şifresi istemez.',
+        'Girdiğin bilgilerin doğruluğu senin sorumluluğundadır.',
+        'Midas, TradingView, TEFAS ve TCMB ile bir bağlantısı ya da ortaklığı yoktur. Bu adlar ve markalar sahiplerine aittir.'
+      ]],
+      ['h', '3. Yatırım tavsiyesi değildir'],
+      ['p', SPK_NOTU],
+      ['p', 'Ayrıntılar Risk Bildirimi\'nde yer alır ve bu şartların parçasıdır.'],
+      ['h', '4. Yapay zekâ içerikleri'],
+      ['p', 'Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma özellikleri Anthropic PBC\'nin hizmetini senin claude.ai hesabınla kullanır. Bu özellikler isteğe bağlıdır, açık rıza vermeden çalışmaz ve kullanımları kendi Claude kullanım hakkından düşer. Üretilen içerik hatalı olabilir; doğrulamadan işlem yapma. Ekran görüntüsünden okunan rakamları kaydetmeden önce kontrol et.'],
+      ['h', '5. Senin yükümlülüklerin'],
+      ['ul', [
+        '18 yaşından büyük olmalısın.',
+        'Uygulamaya yalnızca kendi bilgilerini gir; başkasına ait kişisel veri yükleme.',
+        'Verilerin cihazında ya da claude.ai hesabında tutulur. Düzenli yedek almak senin sorumluluğundadır (Geçmiş → Yedek indir).',
+        'Uygulamayı ve fiyat kaynaklarını aşırı yükleyecek, bozacak ya da hukuka aykırı biçimde kullanmamalısın.'
+      ]],
+      ['h', '6. Sorumluluğun sınırı'],
+      ['p', 'Uygulama ücretsizdir ve "olduğu gibi" sunulur; kesintisiz ya da hatasız çalışacağı garanti edilmez. Yürürlükteki mevzuatın izin verdiği ölçüde Geliştirici; Uygulamadaki bilgi, liste, yorum ve önerilere dayanılarak verilen yatırım kararlarından, fiyat ve hesaplama hatalarından, kesintilerden ve veri kaybından doğan doğrudan ya da dolaylı zararlardan sorumlu değildir. Geliştiricinin kast ve ağır ihmalinden doğan sorumluluğu saklıdır.'],
+      ['h', '7. Üçüncü taraf hizmetler'],
+      ['p', 'Uygulama GitHub üzerinde barındırılır, yazı tiplerini Google Fonts\'tan yükler; claude.ai sürümü ve Claude özellikleri Anthropic\'in hizmetlerini kullanır. Haber bağlantıları Midas\'ın sitesinde açılır. Bu hizmetler kendi kullanım şartlarına ve gizlilik politikalarına tabidir.'],
+      ['h', '8. Değişiklikler'],
+      ['p', 'Geliştirici bu şartları, Uygulamanın özelliklerini değiştirebilir ya da Uygulamayı yayından kaldırabilir. Şartların güncel sürümü her açılışta gösterilir ve yeniden onayın istenir.'],
+      ['h', '9. Uygulanacak hukuk'],
+      ['p', 'Bu şartlara Türkiye Cumhuriyeti hukuku uygulanır. Tüketici sıfatın varsa 6502 sayılı Tüketicinin Korunması Hakkında Kanun\'dan doğan hakların saklıdır.'],
+      ['h', '10. İletişim'], ['link', ILETISIM]
+    ] },
+    kvkk: { t: 'KVKK Aydınlatma Metni', b: [
+      ['p', '6698 sayılı Kişisel Verilerin Korunması Kanunu\'nun ("KVKK") 10. maddesi uyarınca, Portföy Defteri\'ni kullanırken kişisel verilerinin nasıl işlendiğini aşağıda açıklıyoruz.'],
+      ['h', 'Veri sorumlusu'], ['p', SORUMLU + '. Başvuru ve sorular için:'], ['link', ILETISIM],
+      ['h', 'Önce kısaca'],
+      ['ul', [
+        'Hesapsız (GitHub) sürümde girdiğin portföy bilgileri yalnızca kendi cihazındaki tarayıcı depolamasında tutulur. Geliştiriciye ya da bir sunucuya gönderilmez; Geliştirici bu verileri göremez.',
+        'claude.ai sürümünde veriler senin claude.ai hesabına bağlı alanda, Anthropic\'in sunucularında tutulur. Geliştirici bu verilere Uygulama üzerinden erişmez, satmaz, reklam için kullanmaz.',
+        'Claude özelliklerini kullanırsan portföy bilgilerin yorum üretmek için Anthropic\'e (ABD) gönderilir. Bu yalnızca açık rıza verirsen olur.'
+      ]],
+      ['h', 'İşlenen veriler'],
+      ['ul', [
+        'Finansal bilgiler: varlık kodu ve adı, adet, fiyat, ortalama maliyet, aylık ekleme tutarı, hedef oranlar, günlük değer geçmişi.',
+        'Görsel: portföy ekranından yüklediğin ekran görüntüleri (yalnızca okuma için gönderilir; Uygulama görüntüyü saklamaz).',
+        'Claude\'a yazdığın sorular ve üretilen son yorum.',
+        'claude.ai sürümünde claude.ai\'nin Uygulamaya verdiği kullanıcı kimliği.',
+        'Teknik bilgiler: sayfa, fiyat dosyası ve yazı tipleri yüklenirken IP adresin ve tarayıcı bilgilerin GitHub ve Google sunucularına iletilir.',
+        'Onay kaydı: son onay tarihin, onayladığın metin sürümü ve açık rıza durumun (yalnızca cihazında).'
+      ]],
+      ['h', 'Amaçlar'],
+      ['p', 'Portföyünü kaydetmek ve değerini hesaplamak, aylık ekleme planını göstermek, istersen ekran görüntüsünden varlıklarını okumak ve Claude yorumu üretmek, onaylarını kaydetmek ve Uygulamanın teknik olarak çalışmasını sağlamak.'],
+      ['h', 'Hukuki sebepler'],
+      ['ul', [
+        'KVKK md. 5/2-c: Kullanım Şartları kapsamında hizmetin sunulması için zorunlu olması.',
+        'KVKK md. 5/2-f: Uygulamanın güvenli ve teknik olarak çalışması için meşru menfaat.',
+        'KVKK md. 5/1 ve md. 9: Claude özellikleri kapsamında Anthropic\'e (ABD) aktarım için açık rızan.'
+      ]],
+      ['h', 'Toplama yöntemi'],
+      ['p', 'Verileri sen girersin ya da ekran görüntüsünden okutursun; değer geçmişi ve onay kaydı otomatik oluşur. Hepsi elektronik ortamda işlenir.'],
+      ['h', 'Kimlere aktarılır'],
+      ['ul', [
+        'Anthropic PBC (ABD): claude.ai sürümünde verilerin saklanması; açık rızan varsa Claude yorumu, soru ve ekran görüntüsü okuma.',
+        'GitHub, Inc. (ABD): Uygulamanın ve fiyat dosyasının barındırılması (teknik bilgiler).',
+        'Google LLC (ABD): yazı tiplerinin yüklenmesi (teknik bilgiler).'
+      ]],
+      ['p', 'Yurt dışına aktarım KVKK md. 9 çerçevesinde yapılır. Uygulamanın çalışması için zorunlu olmayan Claude özellikleri açık rızana bağlıdır; rıza vermezsen bu özellikler kapalı kalır, diğer her şey çalışır.'],
+      ['h', 'Saklama süresi'],
+      ['p', 'Cihazındaki veriler sen silene kadar (ya da tarayıcı verisini temizleyene kadar) durur. claude.ai hesabındaki veriler sen silene ya da hesabını kapatana kadar durur. Anthropic tarafındaki işleme ve saklama Anthropic\'in gizlilik politikasına tabidir. Geçmiş → Yasal metinler bölümündeki "Verilerimi sil" ile verilerini istediğin an silebilirsin.'],
+      ['h', 'KVKK md. 11 kapsamındaki hakların'],
+      ['ul', [
+        'Kişisel verilerinin işlenip işlenmediğini öğrenme, işlenmişse bilgi isteme,',
+        'İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme,',
+        'Yurt içinde ya da yurt dışında aktarıldığı kişileri bilme,',
+        'Eksik ya da yanlış işlenmişse düzeltilmesini isteme,',
+        'KVKK md. 7 çerçevesinde silinmesini ya da yok edilmesini isteme,',
+        'Düzeltme ve silme işlemlerinin aktarılan kişilere bildirilmesini isteme,',
+        'Otomatik sistemlerle analiz sonucu aleyhine bir sonuç çıkmasına itiraz etme,',
+        'Hukuka aykırı işleme nedeniyle zarara uğrarsan zararın giderilmesini talep etme.'
+      ]],
+      ['p', 'Başvurunu yukarıdaki iletişim adresinden yapabilirsin; en geç 30 gün içinde ücretsiz yanıtlanır. Yanıtı yeterli bulmazsan Kişisel Verileri Koruma Kurulu\'na şikâyette bulunabilirsin.']
+    ] },
+    riza: { t: 'Açık Rıza Metni', b: [
+      ['p', 'Bu rıza isteğe bağlıdır. Vermezsen Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma kapalı kalır; Uygulamanın diğer bütün özellikleri çalışır.'],
+      ['h', 'Rıza verdiğin işlem'],
+      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; Claude özelliklerini kullandığımda portföy bilgilerimin (varlık kodları ve adları, adet, değer, maliyet, kâr/zarar, hedef oranlar, aylık ekleme tutarı), yüklediğim ekran görüntülerinin ve Claude\'a yazdığım soruların, yorum üretilmesi ve görüntüdeki varlıkların okunması amacıyla Anthropic PBC\'ye (Amerika Birleşik Devletleri) aktarılmasına ve orada işlenmesine açık rıza veriyorum.'],
+      ['h', 'Geri çekme'],
+      ['p', 'Rızanı istediğin an Geçmiş → Yasal metinler bölümünden geri çekebilirsin. Geri çekme ileriye dönük sonuç doğurur; daha önce gönderilmiş veriler için Anthropic\'in gizlilik politikası geçerlidir.']
+    ] }
+  };
+
+  function docSheet(k) {
+    const d = DOCS[k];
+    const body = el('div', { class: 'yasal' }, [el('div', { class: 'meta', text: 'Sürüm: ' + YASAL_SURUM }), ...d.b.map(([t, v]) =>
+      t === 'h' ? el('h4', { text: v }) : t === 'ul' ? el('ul', {}, v.map(x => el('li', { text: x }))) :
+      t === 'link' ? el('p', {}, [el('a', { href: v, target: '_blank', rel: 'noopener', text: v.replace('https://', '') })]) : el('p', { text: v }))]);
+    const sh = openSheet(d.t, [body, el('button', { class: 'btn ghost', type: 'button', text: 'Kapat', onclick: () => sh.close() })]);
+  }
+  const lnk = (k, text) => el('button', { class: 'lnk', type: 'button', text: text || DOCS[k].t, onclick: (e) => { e.preventDefault(); e.stopPropagation(); docSheet(k); } });
+
+  function onayScreen() {
+    const mark = el('div', { class: 'mark', 'aria-hidden': 'true', style: 'width:56px;height:56px;border-radius:16px;background:var(--ink);display:grid;place-items:center' });
+    mark.innerHTML = '<svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="14" width="3" height="6" rx="1.2" fill="#2F66C9"/><rect x="8.6" y="11" width="3" height="9" rx="1.2" fill="#C9533A"/><rect x="13.2" y="8" width="3" height="12" rx="1.2" fill="#0D8A6E"/><rect x="17.8" y="5" width="3" height="15" rx="1.2" fill="#B98A1F"/></svg>';
+    const devam = el('button', { class: 'btn', type: 'button', text: 'Onaylıyorum, devam et' });
+    const sync = () => { devam.disabled = !(OK.risk && OK.sart && OK.kvkk); };
+    const kutu = (k, kids, opt) => {
+      const cb = el('input', { type: 'checkbox', id: 'onay-' + k, checked: OK[k], onchange: (e) => { OK[k] = e.target.checked; sync(); } });
+      return el('label', { class: 'chk', for: 'onay-' + k }, [cb, el('span', {}, [...kids, opt ? el('span', { class: 'opt', text: 'İsteğe bağlı' }) : null])]);
+    };
+    devam.addEventListener('click', () => {
+      if (devam.disabled) return;
+      S.onay = true; S.riza = OK.riza; onayYaz();
+      window.scrollTo({ top: 0 }); render(); boot();
+    });
+    sync();
+    const son = onayKaydi();
+    return [el('div', { class: 'onay' }, [
+      mark,
+      el('h1', { text: 'Başlamadan önce' }),
+      el('p', { class: 'lead', text: 'Portföy Defteri\'ni her açtığında bu onayı istiyoruz. Onaylamadan hiçbir hesaba bağlanılmaz ve verin yüklenmez.' }),
+      el('div', { class: 'beyan' }, [el('div', { class: 'eb', text: 'Risk beyanı' }), el('p', { text: RISK_BEYAN })]),
+      el('div', { class: 'onaylar' }, [
+        kutu('risk', ['Yukarıdaki risk beyanını okudum, kabul ediyorum. Ayrıntılar: ', lnk('risk'), '.']),
+        kutu('sart', ['18 yaşından büyüğüm. ', lnk('sartlar'), '\'nı okudum, kabul ediyorum.']),
+        kutu('kvkk', [lnk('kvkk'), '\'ni okudum.']),
+        kutu('riza', ['Claude özelliklerini kullanırsam verilerimin Anthropic\'e (ABD) aktarılmasına ', lnk('riza', 'Açık Rıza Metni'), ' kapsamında rıza veriyorum.'], true)
+      ]),
+      devam,
+      el('p', { class: 'fine', text: son && son.zaman ? 'Son onayın: ' + trTime(son.zaman) + ' · Metin sürümü ' + YASAL_SURUM : 'Metin sürümü ' + YASAL_SURUM })
+    ])];
+  }
+
+  /* Any Claude feature asks for the explicit consent first if it was not given at launch. */
+  function rizaIste(next) {
+    const cb = el('input', { type: 'checkbox', id: 'riza-sonra' });
+    const ok = el('button', { class: 'btn', type: 'button', text: 'Rıza veriyorum, devam et', disabled: 'disabled' });
+    cb.addEventListener('change', () => { ok.disabled = !cb.checked; });
+    const sh = openSheet('Claude için açık rıza', [
+      el('p', { style: 'margin:0', text: 'Bu özellik portföy bilgilerini (ve varsa ekran görüntüsünü) yorum üretmek için Anthropic\'e (ABD) gönderir. Bunun için açık rızan gerekiyor.' }),
+      el('label', { class: 'chk', for: 'riza-sonra' }, [cb, el('span', {}, [lnk('riza', 'Açık Rıza Metni'), ' kapsamında verilerimin Anthropic\'e aktarılmasına rıza veriyorum.'])]),
+      ok, el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ]);
+    ok.addEventListener('click', () => { if (!cb.checked) return; S.riza = true; onayYaz(); sh.close(); render(); next(); });
+  }
+
+  async function verileriSil() {
+    if (S.mode === 'bulut' && S.db && S.uid) {
+      for (const x of S.ekl) await portRef().collection('eklemeler').doc(x.id).delete().catch(() => {});
+      for (const x of S.gec) await portRef().collection('gecmis').doc(x.id).delete().catch(() => {});
+      await portRef().delete().catch(() => {});
+    }
+    try { localStorage.removeItem(LS); localStorage.removeItem('pd-giris'); localStorage.removeItem('pd-tab'); } catch (e) {}
+    toast('Verilerin silindi'); setTimeout(() => location.reload(), 900);
+  }
+
+  function yasalCard() {
+    const son = onayKaydi();
+    const docs = el('div', { class: 'doclist' }, ['sartlar', 'risk', 'kvkk', 'riza'].map(k => el('button', { type: 'button', onclick: () => docSheet(k) }, [el('span', { text: DOCS[k].t }), el('span', { text: 'Oku' })])));
+    const rizaBtn = S.riza
+      ? el('button', { class: 'btn ghost', type: 'button', text: 'Açık rızamı geri çek', onclick: () => { S.riza = false; onayYaz(); AI.text = ''; render(); toast('Açık rızan geri çekildi; Claude özellikleri kapandı'); } })
+      : el('button', { class: 'btn ghost', type: 'button', text: 'Claude için açık rıza ver', onclick: () => rizaIste(() => toast('Açık rıza verildi')) });
+    const silBtn = el('button', { class: 'btn danger', type: 'button', text: S.mode === 'bulut' ? 'Hesabımdaki verilerimi sil' : 'Bu cihazdaki verilerimi sil', onclick: (e) => confirmInline(e.currentTarget, verileriSil, 'Tüm varlıklar ve geçmiş silinecek. Emin misin?') });
+    return card('Yasal metinler', [docs,
+      el('p', { class: 'small muted', style: 'margin:10px 0 12px', text: 'Bu açılışta onaylandı' + (son && son.zaman ? ' (' + trTime(son.zaman) + ')' : '') + ' · Claude için açık rıza: ' + (S.riza ? 'verildi' : 'verilmedi') + ' · Sürüm ' + YASAL_SURUM }),
+      el('div', { style: 'display:grid;gap:10px' }, [rizaBtn, silBtn])]);
+  }
+
   /* ---------- render ---------- */
   function render() {
     const main = document.getElementById('main');
@@ -1312,6 +1537,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     const a = document.activeElement && document.activeElement.id;
     if (a && (['tutar', 'kur', 'aylik', 'aiSoru'].includes(a) || /^h-/.test(a))) return;
     main.textContent = '';
+    if (!S.onay) { document.querySelector('.nav').hidden = true; document.getElementById('top').hidden = true; document.getElementById('banner').hidden = true; main.append(el('div', { class: 'screen' }, onayScreen())); return; }
     const gate = needsGate();
     document.querySelector('.nav').hidden = gate; document.getElementById('top').hidden = gate;
     if (gate) { main.append(el('div', { class: 'screen' }, gateScreen())); return; }
@@ -1328,7 +1554,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', window.scrollY > 4), { passive: true });
 
   if (STANDALONE && 'serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); }
-  boot();
+  render();
 })();
 </script>
 
