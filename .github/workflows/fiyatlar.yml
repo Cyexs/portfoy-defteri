@@ -23,9 +23,12 @@ jobs:
           python-version: "3.12"
       - name: Fiyatları çek
         run: python scripts/fiyat_guncelle.py
+      - name: TEFAS deneme (geçici)
+        run: python scripts/tefas_dene.py || true
       - name: Değiştiyse kaydet
         run: |
-          if git diff --quiet -- fiyatlar.json; then
+          git add tefas_deneme.json 2>/dev/null || true
+          if git diff --quiet -- fiyatlar.json && git diff --cached --quiet; then
             echo "Değişiklik yok"
           else
             git config user.name "github-actions[bot]"
