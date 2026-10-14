@@ -169,7 +169,8 @@ button { cursor: pointer; }
 
 /* Bottom nav */
 .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-.nav-in { max-width: 34rem; margin-inline: auto; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--nav-h); }
+.nav-in { max-width: 34rem; margin-inline: auto; display: grid; grid-template-columns: repeat(6, 1fr); height: var(--nav-h); }
+.nav button { font-size: 11px; }
 .nav button { border: 0; background: none; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
 .nav button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .nav button[aria-current="page"] { color: var(--accent); }
@@ -189,6 +190,32 @@ button { cursor: pointer; }
   .sheet { animation: up .25s cubic-bezier(.2,.7,.2,1); }
   @keyframes up { from { transform: translateY(24px); } to { transform: none; } }
 }
+
+/* v4: ideas and news */
+.idea-sec { display: grid; gap: 4px; padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
+.idea-sec:first-of-type { border-top: 0; margin-top: 4px; padding-top: 0; }
+.idea-h { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14.5px; }
+.idea-h .amt { margin-left: auto; font-family: var(--f-num); font-weight: 500; font-size: 13px; color: var(--ink-2); }
+.idea { display: grid; grid-template-columns: 1fr auto; gap: 1px 12px; padding: 9px 0; border-top: 1px dashed var(--line); }
+.idea:first-of-type { border-top: 0; }
+.idea .k { font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.idea .r { text-align: right; font-family: var(--f-num); font-size: 13.5px; }
+.idea .sub { font-size: 12.5px; color: var(--ink-2); min-width: 0; }
+.idea .r2 { text-align: right; font-size: 12.5px; }
+.held { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--accent); letter-spacing: .02em; }
+.dg { font-family: var(--f-num); font-weight: 500; white-space: nowrap; }
+.dg.up { color: var(--good); } .dg.down { color: var(--bad); } .dg.flat { color: var(--ink-2); }
+.tips { margin: 6px 0 4px; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink); }
+.tipnow { font-size: 13.5px; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-top: 4px; }
+.news { display: grid; gap: 10px; }
+.nitem { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 8px; }
+.nitem .when { font-size: 12px; color: var(--ink-2); font-weight: 600; letter-spacing: .02em; }
+.nitem a.t { color: var(--ink); text-decoration: none; font-weight: 700; font-size: 15.5px; line-height: 1.35; }
+.nitem a.t:hover { text-decoration: underline; }
+.stk { display: flex; flex-wrap: wrap; gap: 6px; }
+.stk span { display: inline-flex; gap: 6px; align-items: center; padding: 4px 9px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; font-weight: 700; }
+.stk span.mine { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.filt { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 /* v3: sign-in gate and Claude review */
 .gate { min-height: calc(100vh - 140px); display: grid; align-content: center; gap: 18px; padding-block: 12px 32px; }
@@ -265,6 +292,7 @@ button { cursor: pointer; }
     <button data-tab="varlik"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Varlıklar</button>
     <button data-tab="ay"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Bu ay</button>
     <button data-tab="gecmis"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/></svg>Geçmiş</button>
+    <button data-tab="haber"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>Haberler</button>
     <button data-tab="yorum"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-5 4z"/><path d="M9 9h6M9 12h4"/></svg>Yorum</button>
   </div>
 </nav>
@@ -466,6 +494,7 @@ button { cursor: pointer; }
       return false;
     }
     S.ortakKur = kur; S.ortakAltin = altin; S.piyasa = piyasa;
+    yanVeri();
     if (S.p.kurKaynak !== 'elle' || !sessiz) { S.p.kur = Number(kur.usdtry); S.p.kurKaynak = 'TCMB'; S.p.kurTarih = kur.tarih; }
     const eksik = [];
     const arr = S.p.pozisyonlar.map(p => {
@@ -541,7 +570,7 @@ button { cursor: pointer; }
     render();
     const sg = S.p.sonGuncelleme && Date.parse(S.p.sonGuncelleme.zaman);
     if (S.p.pozisyonlar.length && (!sg || Date.now() - sg > 10 * 60 * 1000)) guncelleTumu(true);
-    else S.piyasa = await readOrtak('piyasa');
+    else { S.piyasa = await readOrtak('piyasa'); yanVeri(); }
   }
   const strip = (o) => { const c = { ...o }; delete c.id; return c; };
 
@@ -730,12 +759,15 @@ button { cursor: pointer; }
           el('div', { class: 'bar' }, [el('i', { style: `width:${a ? Math.max(0, v) / a * 100 : 0}%;background:${col(g.k)}` })]),
           el('span', { class: 'h', text: v > 0 ? g.hint : 'Bu sefer gerek yok, hedefin üstünde' })]));
       }
+      altinTipGuncelle(r);
     };
-    draw();
     const amountIn = el('div', { class: 'amount' }, [el('span', { text: '₺' }), el('input', { id: 'tutar', type: 'number', inputmode: 'numeric', step: '50', min: '0', value: S.calc, 'aria-label': 'Bölünecek tutar', oninput: (e) => { S.calc = e.target.value; draw(); } })]);
+    const fikirler = fikirlerCard(split(Math.max(0, Number(S.calc) || 0)));
+    setTimeout(draw, 0);
     return [progCard,
       card(kalan > 0 && eklenen > 0 ? 'Kalan tutarı nasıl bölmeli?' : 'Bu ayki tutarı nasıl bölmeli?', [amountIn, el('div', { style: 'height:14px' }), box,
         el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Güncel değerlerine göre hedefin altında kalan gruplara öncelik verir.' })]),
+      fikirler,
       card('Hedef oranlar', hedefForm())];
   }
 
@@ -1135,6 +1167,105 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     ];
   }
 
+  /* ---------- ideas for this month's money, and Midas news ---------- */
+  S.oneriler = null; S.haberler = null;
+  async function yanVeri() {
+    const [o, hb] = await Promise.all([readOrtak('oneriler'), readOrtak('haberler')]);
+    if (o) S.oneriler = o;
+    if (hb) S.haberler = Array.isArray(hb) ? hb : (hb.liste || null);
+    render();
+  }
+  const KURESEL_FIKIR = [
+    { kod: 'VT', ad: 'Tüm dünya hisseleri, yaklaşık 10.000 şirket', not: 'En geniş çeşitlendirme' },
+    { kod: 'VOO', ad: 'S&P 500: ABD\'nin en büyük 500 şirketi', not: 'Çok düşük maliyet' },
+    { kod: 'SCHD', ad: 'ABD temettü hisseleri', not: 'Düzenli temettü' },
+    { kod: 'VXUS', ad: 'ABD dışındaki dünya hisseleri', not: 'ABD ağırlığını dengeler' },
+    { kod: 'QQQ', ad: 'Nasdaq-100, teknoloji ağırlıklı', not: 'Daha oynak' }
+  ];
+  const ALTIN_TUYO = [
+    'Yatırım için en verimlisi has (24 ayar) gram altın. Çeyrek, yarım ve tam altında işçilik payı ve alış-satış farkı daha yüksek.',
+    'Almadan önce alış ve satış fiyatı arasındaki farka (makas) bak; satarken sana alış fiyatından ödenir. Kuyumcu, banka ve aracı kurumu karşılaştır.',
+    'Faturalı ve damgalı (ör. Darphane, İstanbul Altın Rafinerisi) ürün al. Bilezik ve takının işçiliği satarken geri alınmaz.',
+    'Saklama derdi istemiyorsan altın fonu ya da borsadaki altın sertifikası aynı fiyata bağlı ilerler.'
+  ];
+  function degSpan(kod, pazar) {
+    const m = S.piyasa && S.piyasa[pazar + 'D']; const d = m ? m[kod] : undefined;
+    if (typeof d !== 'number') return el('span', { class: 'dg flat', text: '—' });
+    return el('span', { class: 'dg ' + (d > 0.005 ? 'up' : d < -0.005 ? 'down' : 'flat'), text: (d > 0.005 ? '▲ %' : d < -0.005 ? '▼ %' : '%') + n2(Math.abs(d), 2) });
+  }
+  const pf = (m, kod) => S.piyasa && S.piyasa[m] && Number(S.piyasa[m][kod]) > 0 ? Number(S.piyasa[m][kod]) : null;
+  function fikir(kod, ad, detay, sag, sag2, held) {
+    return el('div', { class: 'idea' }, [
+      el('span', { class: 'k' }, [kod, held ? el('span', { class: 'held', text: 'Portföyünde' }) : null]),
+      el('span', { class: 'r', text: sag || '' }),
+      el('span', { class: 'sub', text: ad + (detay ? ' · ' + detay : '') }),
+      el('span', { class: 'r2' }, [sag2 || ''])
+    ]);
+  }
+  function fikirlerCard(r) {
+    const held = new Set(S.p.pozisyonlar.map(p => String(p.kod).toUpperCase()));
+    const o = S.oneriler || {};
+    const sira = GR.slice().sort((a, b) => (r[b.k] || 0) - (r[a.k] || 0));
+    const yuzde = (v) => typeof v === 'number' ? '%' + n2(v, 1) : '—';
+    const bolumler = sira.map(g => {
+      const kids = [];
+      if (g.k === 'kuresel') {
+        for (const f of KURESEL_FIKIR) { const fy = pf('abd', f.kod); kids.push(fikir(f.kod, f.ad, f.not, fy ? '$' + n2(fy) : '', degSpan(f.kod, 'abd'), held.has(f.kod))); }
+      } else if (g.k === 'bist') {
+        const l = o.bist || [];
+        if (!l.length) kids.push(el('p', { class: 'small muted', style: 'margin:4px 0', text: 'Liste fiyatlar güncellenince gelir.' }));
+        for (const x of l) { const fy = pf('bist', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/\s+A\.Ş\.?$/i, ''), 'F/K ' + n2(x.fk, 1) + ' · ROE ' + yuzde(x.roe), fy ? '₺' + n2(fy) : '', degSpan(x.kod, 'bist'), held.has(x.kod))); }
+        kids.push(el('p', { class: 'small muted', style: 'margin:6px 0 0', text: 'Borsa İstanbul\'un en büyük 100 şirketi içinde F/K 2–12 ve özsermaye kârlılığı (ROE) %15–60 olanlar, ROE sırasıyla. Enflasyon muhasebesi oranları etkileyebilir.' }));
+      } else if (g.k === 'kira') {
+        const l = o.kira || [];
+        if (!l.length) kids.push(el('p', { class: 'small muted', style: 'margin:4px 0', text: 'Liste fon fiyatları güncellenince gelir.' }));
+        for (const x of l) { const fy = pf('fon', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/ (KATILIM )?\(TL\)/, '').replace(/ FONU$/, ''), 'risk ' + (x.risk || '—'), fy ? '₺' + n2(fy, 4) : '', el('span', { class: 'dg up', text: '1 yıl ' + yuzde(x.getiri1y != null ? x.getiri1y : x.getiriyb) }), held.has(x.kod))); }
+        kids.push(el('p', { class: 'small muted', style: 'margin:6px 0 0', text: 'TEFAS\'taki kira sertifikası fonları, son 1 yıllık getiriye göre. Geçmiş getiri geleceği göstermez.' }));
+      } else if (g.k === 'altin') {
+        kids.push(el('div', { class: 'tipnow', id: 'altinTip' }));
+        kids.push(el('ul', { class: 'tips' }, ALTIN_TUYO.map(t => el('li', { text: t }))));
+        const l = o.altin || [];
+        if (l.length) kids.push(el('div', { class: 'small', style: 'font-weight:700;margin-top:8px', text: 'Altın fonları' }));
+        for (const x of l) { const fy = pf('fon', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/ FONU$/, ''), 'risk ' + (x.risk || '—'), fy ? '₺' + n2(fy, 4) : '', el('span', { class: 'dg up', text: '1 yıl ' + yuzde(x.getiri1y != null ? x.getiri1y : x.getiriyb) }), held.has(x.kod))); }
+      }
+      return el('div', { class: 'idea-sec' }, [el('div', { class: 'idea-h' }, [el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }), el('span', { class: 'amt', id: 'amt-' + g.k, text: r[g.k] > 0 ? 'bu ay ' + tl0(r[g.k]) : 'bu ay gerek yok' })]), ...kids]);
+    });
+    return card('İncelemeye değer', [...bolumler, el('p', { class: 'small muted', style: 'margin:14px 0 0', text: 'Listeler kriterlere göre otomatik oluşur; yatırım tavsiyesi değildir. BIST fiyatları 15 dakika gecikmelidir.' })]);
+  }
+  function altinTipGuncelle(r) {
+    const e = document.getElementById('altinTip'); if (!e) return;
+    const a = r.altin || 0, g = altinFiyat('gram');
+    if (!a || !g) { e.textContent = 'Bu ay altına ayrılan tutar yok; hedefin üstündesin.'; return; }
+    const gr = a / g;
+    e.textContent = 'Bu ayki ' + tl0(a) + ' ≈ ' + n2(gr, 2) + ' gr altın. ' + (gr < 1
+      ? 'Fiziki alımda alış-satış farkı küçük tutarlarda oransal olarak büyür; birkaç ay biriktirip tek seferde gram almak ya da altın fonu kullanmak daha verimli olabilir.'
+      : 'Bu tutarla gram altın alabilirsin; kuyumcu yerine banka ve aracı kurumların gram fiyatlarını da karşılaştır.');
+    for (const gg of GR) { const am = document.getElementById('amt-' + gg.k); if (am) am.textContent = r[gg.k] > 0 ? 'bu ay ' + tl0(r[gg.k]) : 'bu ay gerek yok'; }
+  }
+
+  let sadeceBenim = false;
+  function scrHaber() {
+    const hb = S.haberler;
+    const held = new Set(S.p.pozisyonlar.map(p => String(p.kod).toUpperCase()));
+    const bugun = ymd(new Date()), dun = ymd(new Date(Date.now() - 864e5));
+    const when = (t) => !t ? '' : t.slice(0, 10) === bugun ? 'Bugün' : t.slice(0, 10) === dun ? 'Dün' : trShort(t.slice(0, 10));
+    const chk = el('input', { type: 'checkbox', id: 'sadeceBenim', checked: sadeceBenim, onchange: (e) => { sadeceBenim = e.target.checked; render(); } });
+    const head = card(null, [el('div', { class: 'filt' }, [
+      el('div', {}, [el('div', { style: 'font-weight:700', text: 'Midas\'ın Kulakları' }), el('div', { class: 'small muted', text: 'Son haberler ve ilgili hisselerin bugünkü değişimi' })]),
+      iconBtn('refresh', 'Yenile', 'ghost sm', () => guncelleTumu(false))
+    ]), held.size ? el('label', { class: 'chk', for: 'sadeceBenim', style: 'margin-top:12px' }, [chk, el('span', { text: 'Sadece portföyümdeki hisselerle ilgili olanlar' })]) : null]);
+    if (!hb || !hb.length) return [head, card(null, el('div', { class: 'empty' }, [el('b', { text: S.loaded ? 'Haberler henüz yüklenmedi' : 'Yükleniyor' }), 'Fiyatları güncelleyince haberler de gelir.']))];
+    let liste = hb;
+    if (sadeceBenim) liste = hb.filter(n => (n.h || []).some(([k]) => held.has(k)));
+    const items = liste.map(n => el('article', { class: 'nitem' }, [
+      el('div', { class: 'when', text: when(n.t) }),
+      el('a', { class: 't', href: n.u, target: '_blank', rel: 'noopener', text: n.b }),
+      (n.h && n.h.length) ? el('div', { class: 'stk' }, n.h.map(([k, pz]) => el('span', { class: held.has(k) ? 'mine' : '' }, [k, degSpan(k, pz)]))) : null
+    ]));
+    return [head, liste.length ? el('div', { class: 'news' }, items) : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Portföyünle ilgili haber yok' }), 'Son haberlerde portföyündeki hisseler geçmiyor.'])),
+      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Haberler Midas\'tan, değişimler TradingView\'den (BIST 15 dk gecikmeli). Habere dokununca Midas\'ta açılır.' })];
+  }
+
   /* ---------- render ---------- */
   function render() {
     const main = document.getElementById('main');
@@ -1147,7 +1278,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     const gate = needsGate();
     document.querySelector('.nav').hidden = gate; document.getElementById('top').hidden = gate;
     if (gate) { main.append(el('div', { class: 'screen' }, gateScreen())); return; }
-    const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis, yorum: scrYorum }[S.tab] || scrOzet;
+    const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis, haber: scrHaber, yorum: scrYorum }[S.tab] || scrOzet;
     main.append(el('div', { class: 'screen' }, scr().filter(Boolean)));
   }
 
