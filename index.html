@@ -778,8 +778,13 @@ button { cursor: pointer; }
       if (tur) { np.altinTur = tur; np.birim = 'TL'; const f = altinFiyat(tur); if (f) np.fiyat = f; }
       return np;
     };
+    let turTouched = false;
     const sync = () => {
       const isAl = grpSel.value === 'altin'; turField.hidden = !isAl;
+      if (isAl && isNew && !savedKod && !turTouched && !turSel.value) turSel.value = 'gram';
+      const fiziki = isAl && !!turSel.value;
+      for (const id of ['e-kod', 'e-ad', 'e-birim']) { const f = document.getElementById(id); if (f) f.closest('.field').hidden = fiziki; }
+      if (!isAl && isNew && !savedKod) { const ko = document.getElementById('e-kod'), ad = document.getElementById('e-ad'); if (ko && ALTIN.some(x => x.kod === ko.value.trim().toUpperCase())) { ko.value = ''; if (ALTIN.some(x => x.n === ad.value)) ad.value = ''; } }
       const tur = isAl ? turSel.value : '', a = AN[tur], f = tur ? altinFiyat(tur) : null;
       const fi = document.getElementById('e-fiyat'), ko = document.getElementById('e-kod'), ad = document.getElementById('e-ad');
       if (!fi) return;
@@ -814,7 +819,7 @@ button { cursor: pointer; }
     const delBtn = el('button', { type: 'button', class: 'btn danger', text: 'Varlığı sil', hidden: isNew ? 'hidden' : false, onclick: (e) => confirmInline(e.currentTarget, async () => {
       clearTimeout(timer); sh.close(); const k = savedKod; await commitPositions(S.p.pozisyonlar.filter(x => x.kod !== k), false); toast(k + ' silindi');
     }) });
-    const form = el('div', { class: 'fgrid', oninput: sched, onchange: (e) => { if (e.target === grpSel || e.target === turSel) sync(); sched(); } }, [
+    const form = el('div', { class: 'fgrid', oninput: sched, onchange: (e) => { if (e.target === turSel) turTouched = true; if (e.target === grpSel || e.target === turSel) sync(); sched(); } }, [
       inp('e-kod', 'Kod', d.kod, { type: 'text', autocapitalize: 'characters', readonly: isNew ? false : 'readonly' }),
       inp('e-ad', 'Ad', d.ad, { type: 'text' }),
       el('div', { class: 'field' }, [el('label', { for: 'e-grup', text: 'Grup' }), grpSel]),
