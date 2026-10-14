@@ -191,6 +191,15 @@ button { cursor: pointer; }
   @keyframes up { from { transform: translateY(24px); } to { transform: none; } }
 }
 
+/* v5: grouped holdings */
+.gcard { background: color-mix(in srgb, var(--gc) 7%, var(--surface)); border-top: 4px solid var(--gc); padding-top: 14px; }
+.gcard .gtop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gcard .gname { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; min-width: 0; flex-wrap: wrap; }
+.gcard .gcount { font-weight: 500; font-size: 12.5px; color: var(--ink-2); }
+.gcard .gval { font-family: var(--f-display); font-size: 21px; white-space: nowrap; }
+.gcard .gmeta { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--ink-2); margin: 4px 0 6px; font-family: var(--f-num); }
+.gcard .item { border-top-color: color-mix(in srgb, var(--gc) 18%, var(--line)); }
+
 /* v4: ideas and news */
 .idea-sec { display: grid; gap: 4px; padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
 .idea-sec:first-of-type { border-top: 0; margin-top: 4px; padding-top: 0; }
@@ -594,7 +603,7 @@ button { cursor: pointer; }
     const tot = parts.reduce((a, p) => a + p.v, 0) || 1;
     for (const p of parts) {
       const len = p.v / tot * C; if (len <= 0) continue;
-      s.append(svgEl('circle', { cx: 60, cy: 60, r: R, fill: 'none', stroke: p.c, 'stroke-width': 18, 'stroke-dasharray': `${Math.max(0, len - 1.5)} ${C}`, 'stroke-dashoffset': -off, transform: 'rotate(-90 60 60)' }));
+      s.append(svgEl('circle', { cx: 60, cy: 60, r: R, fill: 'none', style: 'stroke:' + p.c, 'stroke-width': 18, 'stroke-dasharray': `${Math.max(0, len - 1.5)} ${C}`, 'stroke-dashoffset': -off, transform: 'rotate(-90 60 60)' }));
       off += len;
     }
     return s;
@@ -715,14 +724,41 @@ button { cursor: pointer; }
     return card(null, [head, rows, el('div', { class: 'src small muted', style: 'margin-top:6px', text: (a.kaynak || 'Serbest piyasa') + ' · ' + trTime(a.zaman) })]);
   }
 
+  function varlikPasta(t) {
+    // One slice per asset, clustered by group; each group keeps its hue, lighter for smaller holdings.
+    const sirali = [];
+    for (const g of GR) {
+      const ps = S.p.pozisyonlar.filter(p => (GN[p.grup] ? p.grup : 'bist') === g.k).sort((a, b) => val(b) - val(a));
+      ps.forEach((p, i) => sirali.push({ p, g: g.k, v: val(p), c: `color-mix(in srgb, var(${GN[g.k].c}) ${Math.max(38, 100 - i * 14)}%, var(--surface))` }));
+    }
+    const ad = (p) => p.altinTur && AN[p.altinTur] ? AN[p.altinTur].n : p.kod;
+    const svg = donut(sirali.map(x => ({ v: x.v, c: x.c })));
+    const mid = svgEl('text', { x: 60, y: 57, 'text-anchor': 'middle', style: 'font-family:var(--f-display);font-size:17px;fill:var(--ink)' }); mid.textContent = String(sirali.length);
+    const mid2 = svgEl('text', { x: 60, y: 72, 'text-anchor': 'middle', style: 'font-family:var(--f-body);font-size:9.5px;fill:var(--ink-2)' }); mid2.textContent = 'varlık';
+    svg.append(mid, mid2);
+    const enBuyuk = sirali.slice().sort((a, b) => b.v - a.v);
+    const ust = enBuyuk.slice(0, 7), kalan = enBuyuk.slice(7);
+    const satir = (c, ad_, v) => el('div', { class: 'lg' }, [el('span', { class: 'sw', style: `background:${c}` }), el('span', { text: ad_ }), el('span', { class: 'num small', text: '%' + n2(t.T ? v / t.T * 100 : 0, 1) })]);
+    const legend = el('div', { class: 'legend', style: 'gap:7px' }, [
+      ...ust.map(x => satir(x.c, ad(x.p), x.v)),
+      kalan.length ? satir('var(--line)', 'Diğer ' + kalan.length + ' varlık', kalan.reduce((a, x) => a + x.v, 0)) : null
+    ]);
+    return card('Varlık dağılımı', [el('div', { class: 'alloc' }, [svg, legend]), el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Aynı renk tonları aynı gruba ait; koyu dilimler o gruptaki büyük varlıklar.' })]);
+  }
+
   function scrVarlik() {
     if (!S.p.pozisyonlar.length) return [kurCard(), altinCard(), S.loaded ? onboarding() : null];
     const t = totals();
-    const blocks = GR.map(g => {
+    const kartlar = GR.map(g => {
       const ps = S.p.pozisyonlar.filter(p => (GN[p.grup] ? p.grup : 'bist') === g.k).sort((a, b) => val(b) - val(a));
       if (!ps.length) return null;
-      return el('div', {}, [
-        el('div', { class: 'grp-h' }, [el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }), el('span', { text: tl0(t.g[g.k]) })]),
+      const gk = t.g[g.k] - t.gc[g.k], gkp = t.gc[g.k] ? gk / t.gc[g.k] * 100 : 0;
+      return el('section', { class: 'card gcard', style: `--gc: var(${g.c})` }, [
+        el('div', { class: 'gtop' }, [
+          el('div', { class: 'gname' }, [el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }), el('span', { class: 'gcount', text: ps.length + ' varlık' })]),
+          el('div', { class: 'gval num', text: tl0(t.g[g.k]) })
+        ]),
+        el('div', { class: 'gmeta' }, [el('span', { text: 'Portföyün %' + n2(t.T ? t.g[g.k] / t.T * 100 : 0, 1) + "'i" }), el('span', { class: gk >= 0 ? 'pos' : 'neg', text: sgnTl(gk) + ' · ' + sgnPct(gkp) })]),
         el('div', { class: 'list' }, ps.map(p => {
           const v = val(p), c = cost(p), k = v - c, kp = c ? k / c * 100 : 0, cur = p.birim === 'USD' ? '$' : '₺';
           return el('button', { class: 'item', type: 'button', onclick: () => editSheet(p) }, [
@@ -733,10 +769,11 @@ button { cursor: pointer; }
         }))
       ]);
     });
-    return [kurCard(), altinCard(), card('Varlıklar · ' + S.p.pozisyonlar.length, el('div', { style: 'display:grid;gap:16px' }, blocks)),
+    return [varlikPasta(t), ...kartlar,
       el('div', { class: 'btns' }, [STANDALONE ? null : iconBtn('image', 'Görüntüden', 'ghost', () => pickImages()), el('button', { class: 'btn ghost', type: 'button', style: STANDALONE ? 'grid-column:1/-1' : '', text: '+ Altın ekle', onclick: () => editSheet(null, { grup: 'altin', altinTur: 'gram' }) }),
         el('button', { class: 'btn', type: 'button', text: '+ Varlık ekle', onclick: () => editSheet(null), style: 'grid-column:1/-1' })]),
-      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Bir varlığa dokun; değiştirdiğin her şey otomatik kaydedilir.' })];
+      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Bir varlığa dokun; değiştirdiğin her şey otomatik kaydedilir.' }),
+      kurCard(), altinCard()];
   }
 
   function scrAy() {
