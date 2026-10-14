@@ -166,55 +166,70 @@ def _hisseler(baslik, ozet, bist, abd):
     return hisseler[:6]
 
 
-def midas_haberleri(bist, abd):
-    """Midas'ın Kulakları'ndaki son haber başlıkları. Haber metnini saklamıyoruz: başlık, bağlantı, tarih
-    ve başlıkta/özette geçen hisse kodları."""
+AYLAR = {"ocak": 1, "şubat": 2, "mart": 3, "nisan": 4, "mayıs": 5, "haziran": 6, "temmuz": 7, "ağustos": 8,
+         "eylül": 9, "ekim": 10, "kasım": 11, "aralık": 12}
+
+
+def _metin(html_):
+    import re, html as _h
+    html_ = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html_)
+    return re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", html_))).strip()
+
+
+def _haber_hisseleri(link, bist, abd):
+    """Haber sayfasının metninde en çok geçen hisse kodları (Midas'taki 'ilgili hisseler' gibi)."""
     import re
-    from email.utils import parsedate_to_datetime
-    haberler = []
-    # 1) Bölümün kendi RSS akışı
-    for adres in ("https://www.getmidas.com/midasin-kulaklari/feed/", "https://www.getmidas.com/feed/?post_type=midasin-kulaklari"):
-        try:
-            kok = ET.fromstring(getir(adres))
-        except Exception:
+    from collections import Counter
+    ham = getir(link).decode("utf-8", "replace")
+    m = re.search(r"(?is)<article[^>]*>(.*?)</article>", ham) or re.search(r'(?is)<div[^>]+class="[^"]*(?:entry-content|post-content|content-detail|detail-content)[^"]*"[^>]*>(.*)', ham)
+    govde = _metin(m.group(1) if m else ham)[:20000]
+    sayac = Counter(k for k in re.findall(r"\b[A-Z]{4,6}\b", govde) if k in bist and k not in HABER_DISI)
+    return [[k, "bist"] for k, _ in sayac.most_common(4)]
+
+
+def midas_haberleri(bist, abd, eski_haberler):
+    """Midas'ın Kulakları sayfasındaki son haberler. Haber metnini saklamıyoruz: başlık, bağlantı, tarih
+    ve ilgili hisse kodları. Daha önce okunan haber sayfaları tekrar istenmez."""
+    import re
+    ham = getir("https://www.getmidas.com/midasin-kulaklari/").decode("utf-8", "replace")
+    onceki = {h["u"]: h for h in (eski_haberler or [])}
+    gorulen, haberler = set(), []
+    for m in re.finditer(r'(?is)<a[^>]+href="(https://www\.getmidas\.com/midasin-kulaklari/[^"#?]+-p-(\d+)/?)"[^>]*>(.*?)</a>', ham):
+        link, no, ic = m.group(1), int(m.group(2)), m.group(3)
+        if link in gorulen:
             continue
-        for item in kok.iter("item"):
-            baslik = (item.findtext("title") or "").strip()
-            link = (item.findtext("link") or "").strip()
-            if not baslik or "/midasin-kulaklari/" not in link:
-                continue
+        b = re.search(r"(?is)<h[1-4][^>]*>(.*?)</h[1-4]>", ic)
+        baslik = _metin(b.group(1)) if b else ""
+        if not baslik:
+            alt = re.search(r'alt="([^"]+)"', ic)
+            baslik = _metin(alt.group(1)) if alt else ""
+        if not baslik:
+            continue
+        gorulen.add(link)
+        tarih = None
+        t = re.search(r"([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+(\d{1,2}),\s*(\d{4})", _metin(ic))
+        if t and t.group(1).lower() in AYLAR:
+            tarih = f"{t.group(3)}-{AYLAR[t.group(1).lower()]:02d}-{int(t.group(2)):02d}"
+        haberler.append({"b": baslik[:160], "u": link, "t": tarih, "n": no})
+    haberler.sort(key=lambda h: -h["n"])
+    haberler = haberler[:20]
+    if not haberler:
+        raise ValueError("haber listesi okunamadı")
+    for h in haberler:
+        h["h"] = _hisseler(h["b"], "", bist, abd)
+        if h["u"] in onceki and onceki[h["u"]].get("hs") is not None:
+            ek = onceki[h["u"]]["hs"]
+        else:
             try:
-                tarih = parsedate_to_datetime(item.findtext("pubDate")).astimezone(TR).isoformat(timespec="minutes")
+                ek = _haber_hisseleri(h["u"], bist, abd)
             except Exception:
-                tarih = None
-            ozet = re.sub(r"<[^>]+>", " ", item.findtext("description") or "")
-            haberler.append({"b": baslik[:160], "u": link, "t": tarih, "h": _hisseler(baslik, ozet, bist, abd)})
-        if haberler:
-            break
-    # 2) WordPress veri kaynağı (bölüm ayrı bir içerik türüyse)
-    if not haberler:
-        turler = json.loads(getir("https://www.getmidas.com/wp-json/wp/v2/types"))
-        taban = None
-        for t in turler.values():
-            metin = (t.get("slug", "") + " " + t.get("rest_base", "") + " " + t.get("name", "")).lower()
-            if "kulak" in metin:
-                taban = t.get("rest_base") or t.get("slug")
-                break
-        if not taban:
-            raise ValueError("haber içerik türü bulunamadı: " + ", ".join(list(turler)[:12]))
-        kayitlar = json.loads(getir(f"https://www.getmidas.com/wp-json/wp/v2/{taban}?per_page=25&_fields=title,link,date,excerpt"))
-        import html as _html
-        for r in kayitlar:
-            baslik = _html.unescape(re.sub(r"<[^>]+>", "", (r.get("title") or {}).get("rendered", ""))).strip()
-            link = r.get("link") or ""
-            ozet = re.sub(r"<[^>]+>", " ", (r.get("excerpt") or {}).get("rendered", ""))
-            tarih = (r.get("date") or "")[:16]
-            haberler.append({"b": baslik[:160], "u": link, "t": (tarih + "+03:00") if tarih else None, "h": _hisseler(baslik, ozet, bist, abd)})
-    haberler = [h for h in haberler if h["b"] and h["u"].startswith("https://www.getmidas.com/")]
-    haberler.sort(key=lambda h: h["t"] or "", reverse=True)
-    if not haberler:
-        raise ValueError("haber bulunamadı")
-    return haberler[:25]
+                ek = []
+        h["hs"] = ek
+        for kod, pazar in ek:
+            if len(h["h"]) < 6 and not any(x[0] == kod for x in h["h"]):
+                h["h"].append([kod, pazar])
+        h.pop("n", None)
+    return haberler
 
 
 def main():
@@ -280,7 +295,7 @@ def main():
     yeni["piyasa"] = piyasa
     yeni["oneriler"] = oneriler
     try:
-        yeni["haberler"] = midas_haberleri(piyasa.get("bist") or {}, piyasa.get("abd") or {})
+        yeni["haberler"] = midas_haberleri(piyasa.get("bist") or {}, piyasa.get("abd") or {}, eski.get("haberler"))
         yeni["haberZaman"] = zaman
         print("haber", len(yeni["haberler"]))
     except Exception as e:
