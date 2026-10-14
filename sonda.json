@@ -1,0 +1,86 @@
+{
+ "https://www.getmidas.com/midasin-kulaklari/": {
+  "status": 200,
+  "ct": "text/html; charset=UTF-8",
+  "len": 313993,
+  "basi": "<!DOCTYPE html>\n<html lang=\"tr\" prefix=\"og: https://ogp.me/ns#\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n  <meta name=\"google-site-verification\" content=\"g0zKC_09X1Tk-A4s5YZ4rQVkJk-sxxzR2as-LPYcNE0\" />\n  <meta name=\"viewport\" content=\"width=device",
+  "next_data": false,
+  "nuxt": false,
+  "api_url_ornek": [],
+  "link_cevresi": ">                                    </div>\n                                                                        <div class=\"col-lg-4 col-md-6 fadeInUp-scroll\"\n                                        data-delay=\"600\">\n                                        <div class=\"daily-newsletters-block-body-item\">\n    <a href=\"https://www.getmidas.com/midasin-kulaklari/fiyatin-ardinda-ayni-yukselis-farkli-dayanaklar-p-813938\">\n                    <div class=\"daily-newsletters-block-body-item-thumb\">\n                <img src=\"https://webcdn.getmidas.com/uploads/2026/08/27152943/fiyatin-ardinda-1920x1080-1.png\" alt=\"Fiyatın Ardında: Aynı yükseliş, farklı dayanaklar\" />\n            </div>\n                <div class=\"daily-newsletters-block-body-item-subtitle\">\n            <span>Ekim 13, 2026 • 4 dakika okuma süresi</span>\n            <h3>\n                Fiyatın Ardında: Aynı yükseliş, farklı dayanaklar            </h3>\n                        <div class=\"daily-newsletters-block-body-item-subtitle-button\">\n                Devamını Oku            </div>\n        </div>\n    </a>\n</div>                                    </div>\n                                                                        <div class=\"col-lg-4 col-md-6 fadeInUp-scroll\"\n                                        data-delay=\"700\">\n                                        <div class=\"daily-newsletters-block-body-item\">\n    <a href=\"https://www.getmidas.com/midasin-kulaklari/midas-ile-gun-sonu-jpm-akbnk-gs-cvkmd-unh-fonet-p-813836\">\n                    <div class=\"daily-newsletters-block-body-item-thumb\">\n                <img src=\"https://webcdn.getmidas.com/uploads/2024/04/29172843/fon-min-1.webp\" alt=\"Midas ile gün sonu: JPM, AKBNK, GS, CVKMD, UNH, FONET\" />\n            </div>\n                <div class=\"daily-new"
+ },
+ "https://www.getmidas.com/feed/": {
+  "status": 200,
+  "ct": "application/rss+xml; charset=UTF-8",
+  "len": 84455,
+  "basi": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\"\n\txmlns:content=\"http://purl.org/rss/1.0/modules/content/\"\n\txmlns:wfw=\"http://wellformedweb.org/CommentAPI/\"\n\txmlns:dc=\"http://purl.org/dc/elements/1.1/\"\n\txmlns:atom=\"http://www.w3.org/2005/Atom\"\n\txmlns:sy=\"http://purl.org/rss/1.0/modules/syndi",
+  "next_data": false,
+  "nuxt": false,
+  "api_url_ornek": []
+ },
+ "https://www.getmidas.com/wp-json/wp/v2/posts?per_page=3": {
+  "status": 200,
+  "ct": "application/json; charset=UTF-8",
+  "len": 40453,
+  "basi": "[{\"id\":807305,\"date\":\"2026-10-12T00:01:00\",\"date_gmt\":\"2026-10-11T21:01:00\",\"guid\":{\"rendered\":\"https:\\/\\/www.getmidas.com\\/?p=807305\"},\"modified\":\"2026-10-09T14:27:06\",\"modified_gmt\":\"2026-10-09T11:27:06\",\"slug\":\"iphone-duo-cekilis-kosullari-12-10-2026-01-11-2026\",\"status\":\"publish\",\"type\":\"post\",\"",
+  "next_data": false,
+  "nuxt": false,
+  "api_url_ornek": []
+ },
+ "https://www.getmidas.com/midasin-kulaklari/midas-ile-gun-sonu-jpm-akbnk-gs-cvkmd-unh-fonet-p-813836": {
+  "status": 200,
+  "ct": "text/html; charset=UTF-8",
+  "len": 195795,
+  "basi": "<!DOCTYPE html>\n<html lang=\"tr\" prefix=\"og: https://ogp.me/ns#\">\n\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n  <meta name=\"google-site-verification\" content=\"g0zKC_09X1Tk-A4s5YZ4rQVkJk-sxxzR2as-LPYcNE0\" />\n  <meta name=\"viewport\" content=\"width=device",
+  "next_data": false,
+  "nuxt": false,
+  "api_url_ornek": [],
+  "k_AKBNK": "getmidas.com/wp-content/themes/basework/dist/fonts/inter_semibold.ttf\" type=\"font/ttf\" crossorigin fetchpriority=\"high\">\n  <link rel=\"preload\" as=\"font\" href=\"https://www.getmidas.com/wp-content/themes/basework/dist/fonts/inter_bold.ttf\" type=\"font/ttf\" crossorigin fetchpriority=\"high\">\n  \n<!-- Search Engine Optimization by Rank Math PRO - https://rankmath.com/ -->\n<title>Midas ile gün sonu: JPM, AKBNK, GS, CVKMD, UNH, FONET - Midas</title>\n<meta name=\"description\" content=\"Midas ile gün sonu: JPM, AKBNK, GS, CVKMD, UNH, FONET. En güncel borsa ve finans haberleri Midas&#039;ta!\"/>\n<meta name=\"robots\" content=\"follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large\"/>\n<link rel=\"canonical\" href=\"https://www.getmidas.com/midasin-kulaklari/midas-ile-gun-sonu-jpm-akbnk-gs-",
+  "k_%": "us-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 1",
+  "k_change": "contain-item-title.style-obstruct::-webkit-scrollbar,\n  footer nav.footer-menu-main-container .menu-container::-webkit-scrollbar,\n  footer nav.footer-menu-main-container .collapse::-webkit-scrollbar,\n  footer nav.footer-menu-main-container .footer-menu-child-list::-webkit-scrollbar {\n    display: none !important;\n    width: 0 !important;\n    height: 0 !important;\n  }\n\t\n\t\t\n\t/* kredilit islem title change text align left desktop */\n\t.main-kredili-islem .easy-investment-head .easy-investment-title h2{\n\t\ttext-align: left !important;\n\t}\n}\n\n\n/* eu page safe investemnt hide */\n.main-eu .safe-invest{\n\tdisplay: none !important;\n}\n@media (min-width: 992px) {\n\t.main-eu .easy-investment{\n\t\tmargin-bottom: 0px !important;\n\t}\n}\n\n/* destek page padding */\n@media (min-width: 992px) {\n\t.main-support .midas-"
+ },
+ "tv": {
+  "totalCount": 650,
+  "data": [
+   {
+    "s": "BIST:ASELS",
+    "d": [
+     "ASELS",
+     346.75,
+     -1.1404133998574484,
+     42.602467072931,
+     15.602807923099801,
+     1599420000000,
+     0.0668992159657876,
+     "ASELSAN ELEKTRONİK SANAYİ VE TİCARET A.Ş."
+    ]
+   },
+   {
+    "s": "BIST:QNBTR",
+    "d": [
+     "QNBTR",
+     154,
+     0,
+     15.346746788643406,
+     32.4912597678433,
+     847000000000,
+     0,
+     "QNB Bank AS"
+    ]
+   },
+   {
+    "s": "BIST:TUPRS",
+    "d": [
+     "TUPRS",
+     394,
+     2.138690861957226,
+     10.931053903412764,
+     18.2096828624145,
+     743261423645,
+     4.43989138042774,
+     "TÜPRAŞ-TÜRKİYE PETROL RAFİNERİLERİ A.Ş."
+    ]
+   }
+  ]
+ }
+}
