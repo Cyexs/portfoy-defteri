@@ -1,0 +1,54 @@
+{
+ "liste_adet": 1071,
+ "liste_ornek": [
+  {
+   "fonKodu": "AU1",
+   "fonUnvan": "A1 CAPİTAL PORTFÖY ALTIN FONU",
+   "fonTurAciklama": "Kıymetli Madenler Şemsiye Fonu",
+   "tefasDurum": true,
+   "getiri1a": -2.8641,
+   "getiri3a": 8.6612,
+   "getiri6a": -2.0575,
+   "getiri1y": null,
+   "getiriyb": 9.8081,
+   "getiri3y": null,
+   "getiri5y": null,
+   "getiriOrani": null,
+   "riskDegeri": "6"
+  },
+  {
+   "fonKodu": "BON",
+   "fonUnvan": "A1 CAPİTAL PORTFÖY BORÇLANMA ARAÇLARI FONU",
+   "fonTurAciklama": "Borçlanma Araçları Şemsiye Fonu",
+   "tefasDurum": true,
+   "getiri1a": 1.2168,
+   "getiri3a": 13.5891,
+   "getiri6a": 19.8492,
+   "getiri1y": null,
+   "getiriyb": 22.066,
+   "getiri3y": null,
+   "getiri5y": null,
+   "getiriOrani": null,
+   "riskDegeri": "5"
+  }
+ ],
+ "fiyat_adet": 23,
+ "fiyat_son": [
+  {
+   "fonKodu": "RBV",
+   "fonUnvan": "ALBARAKA PORTFÖY KISA VADELİ KİRA SERTİFİKALARI KATILIM (TL) FONU",
+   "kategoriDerece": 30,
+   "kategoriFonSay": 121,
+   "tarih": "2026-10-13",
+   "fiyat": 7.278083
+  },
+  {
+   "fonKodu": "RBV",
+   "fonUnvan": "ALBARAKA PORTFÖY KISA VADELİ KİRA SERTİFİKALARI KATILIM (TL) FONU",
+   "kategoriDerece": 30,
+   "kategoriFonSay": 121,
+   "tarih": "2026-10-14",
+   "fiyat": 7.284902
+  }
+ ]
+}
