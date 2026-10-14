@@ -8,8 +8,8 @@ Her çalıştığında fiyatlar.json dosyasını yeniler:
             TEFAS yatırım fonlarının son fiyatları (tefas.gov.tr).
 Bir kaynağa ulaşılamazsa o bölümün önceki değeri korunur. Sadece Python standart kütüphanesi kullanılır.
 """
-import http.cookiejar
 import json
+import os
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -71,38 +71,43 @@ def tradingview(pazar, adet, siralama):
     return sonuc
 
 
+def tefas_post(yol, govde):
+    ham = getir("https://www.tefas.gov.tr" + yol, json.dumps(govde).encode(),
+                {"Content-Type": "application/json", "Accept": "application/json, text/plain, */*"})
+    return json.loads(ham).get("resultList") or []
+
+
 def tefas():
-    # TEFAS önce sayfayı ziyaret edip oturum çerezi almayı bekliyor.
-    jar = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-    def ac(url, data=None, headers=None):
-        h = {"User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9"}
-        h.update(headers or {})
-        with opener.open(urllib.request.Request(url, data=data, headers=h), timeout=40) as r:
-            return r.read()
-    ac("https://www.tefas.gov.tr/TarihselVeriler.aspx")
-    bugun = datetime.now(TR).date()
-    for geri in range(0, 8):
-        g = bugun - timedelta(days=geri)
-        tarih = g.strftime("%d.%m.%Y")
-        form = urllib.parse.urlencode({"fontip": "YAT", "sfontur": "", "fonkod": "", "fongrup": "", "bastarih": tarih,
-                                       "bittarih": tarih, "fonturkod": "", "fonunvantip": "", "kurucukod": ""}).encode()
-        ham = ac("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", form, {
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest",
-            "Origin": "https://www.tefas.gov.tr", "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx"})
+    """TEFAS'taki tüm yatırım fonlarının son fiyatı. 2026'daki yeni API fon başına çalışıyor;
+    o yüzden günde bir kez, az sayıda paralel istekle çekiyoruz."""
+    from concurrent.futures import ThreadPoolExecutor
+    liste = tefas_post("/api/funds/fonGetiriBazliBilgiGetir", {
+        "dil": "TR", "fonTipi": "YAT", "kurucuKodu": None, "sfonTurKod": None, "fonTurAciklama": None, "islem": 1,
+        "fonTurKod": None, "fonGrubu": None, "donemGetiri1a": "1", "donemGetiri3a": "1", "donemGetiri6a": "1",
+        "donemGetiri1y": "1", "donemGetiriyb": "1", "donemGetiri3y": "1", "donemGetiri5y": "1",
+        "basTarih": None, "bitTarih": None, "calismaTipi": 2, "getiriOrani": "1"})
+    kodlar = sorted({r["fonKodu"].upper() for r in liste if r.get("fonKodu")})
+    if len(kodlar) < 100:
+        raise ValueError(f"fon listesi çok kısa ({len(kodlar)})")
+
+    def bir_fon(kod):
         try:
-            veri = json.loads(ham).get("data") or []
-        except ValueError:
-            raise ValueError("TEFAS JSON yerine şunu döndürdü: " + ham[:120].decode("utf-8", "replace"))
-        fiyatlar = {}
-        for s in veri:
-            kod, fiyat = s.get("FONKODU"), s.get("FIYAT")
-            if kod and isinstance(fiyat, (int, float)) and fiyat > 0:
-                fiyatlar[kod.upper()] = round(float(fiyat), 6)
-        if len(fiyatlar) > 100:
-            return fiyatlar, g.isoformat()
-    raise ValueError("TEFAS verisi bulunamadı")
+            satirlar = tefas_post("/api/funds/fonFiyatBilgiGetir", {"fonKodu": kod, "dil": "TR", "periyod": 1})
+            satirlar = [r for r in satirlar if isinstance(r.get("fiyat"), (int, float)) and r["fiyat"] > 0]
+            if not satirlar:
+                return None
+            son = max(satirlar, key=lambda r: r.get("tarih") or "")
+            return kod, round(float(son["fiyat"]), 6), son.get("tarih")
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=6) as havuz:
+        sonuclar = [x for x in havuz.map(bir_fon, kodlar) if x]
+    fiyatlar = {k: f for k, f, _ in sonuclar}
+    tarihler = sorted({t for _, _, t in sonuclar if t})
+    if len(fiyatlar) < 100:
+        raise ValueError(f"çok az fon fiyatı ({len(fiyatlar)}/{len(kodlar)})")
+    return fiyatlar, (tarihler[-1] if tarihler else None)
 
 
 def main():
@@ -146,14 +151,19 @@ def main():
         except Exception as e:
             print(anahtar, "okunamadı, önceki fiyatlar korunuyor:", e)
             hatalar[anahtar] = str(e)[:200]
-    try:
-        fon, fon_tarih = tefas()
-        piyasa["fon"] = fon
-        piyasa["fonTarih"] = fon_tarih
-        print("fon", len(fon), "fiyat,", fon_tarih)
-    except Exception as e:
-        print("TEFAS okunamadı, önceki fiyatlar korunuyor:", e)
-        hatalar["fon"] = (type(e).__name__ + ": " + str(e))[:200]
+    bugun = simdi.date().isoformat()
+    if piyasa.get("fonGun") != bugun or os.environ.get("TEFAS_ZORLA"):
+        try:
+            fon, fon_tarih = tefas()
+            piyasa["fon"] = fon
+            piyasa["fonTarih"] = fon_tarih
+            piyasa["fonGun"] = bugun
+            print("fon", len(fon), "fiyat,", fon_tarih)
+        except Exception as e:
+            print("TEFAS okunamadı, önceki fiyatlar korunuyor:", e)
+            hatalar["fon"] = (type(e).__name__ + ": " + str(e))[:200]
+    else:
+        print("Fon fiyatları bugün zaten alındı.")
     piyasa["kaynak"] = {"bist": "TradingView (15 dk gecikmeli)", "abd": "TradingView", "fon": "TEFAS"}
     yeni["piyasa"] = piyasa
     yeni["hatalar"] = hatalar
