@@ -42,7 +42,7 @@ Anthropic API anahtarı bu sunucuda gizli durur; uygulamanın içinde görünmez
 - **Model:** yorum için Claude Sonnet 5.5, ekran görüntüsü okuma için Claude Haiku 5.5.
 - **Sınırlar (İstanbul saatine göre günlük):** kişi başı 3 yorum ve 5 görüntü okuma; tüm uygulama için toplam 60 istek.
   Değiştirmek için `api/wrangler.toml` içindeki `GUNLUK_YORUM`, `GUNLUK_OKU`, `GUNLUK_TOPLAM`.
-- **Maliyet:** bir yorum yaklaşık 1 sent, bir görüntü okuma 1 sentin altında. Toplam sınır doluysa bile ayda en fazla ~25 $ eder.
+- **Maliyet:** bir yorum en fazla ~2 sent, bir görüntü okuma 1 sentin altında. Toplam sınır her gün dolsa bile ayda en fazla ~30 $ eder; gerçek kullanımda çok daha az.
   Asıl güvence, Anthropic Console'da koyacağın aylık harcama sınırıdır.
 - **Gizlilik:** sunucu portföy verisini, görüntüleri ve soruları saklamaz; kayıt (log) kapalıdır. Günlük sayaç için sadece
   rastgele cihaz kimliği ve IP'nin tek yönlü özeti tutulur, iki gün içinde silinir.
