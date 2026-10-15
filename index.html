@@ -361,6 +361,41 @@ button { cursor: pointer; }
 
   const STANDALONE = typeof window.claude === 'undefined';
   const CANLI = STANDALONE ? 'Canlı fiyat dosyası' : 'Claude bağlantısı';
+  /* ---------- API (GitHub version): Claude features through the app's own server, with daily limits ---------- */
+  const API = { url: null, kalan: null };
+  const cihazId = (() => { try { let c = localStorage.getItem('pd-cihaz'); if (!c) { c = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(36).slice(2)); localStorage.setItem('pd-cihaz', c); } return c; } catch (e) { return 'gecici-' + Math.random().toString(36).slice(2, 12); } })();
+  async function apiYukle() {
+    if (!STANDALONE) return;
+    try { const r = await fetch('api.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && /^https:\/\//.test(j.url || '')) API.url = j.url.replace(/\/$/, ''); } } catch (e) {}
+    if (API.url) { try { const r = await fetch(API.url + '/durum?cihaz=' + encodeURIComponent(cihazId)); if (r.ok) API.kalan = await r.json(); } catch (e) {} }
+  }
+  const apiHata = async (r) => { let m = 'Bağlantı kurulamadı; tekrar dene.'; try { const j = await r.json(); if (j && j.mesaj) m = j.mesaj; } catch (e) {} const er = new Error(m); er.code = 'api'; er.status = r.status; return er; };
+  async function apiYorum(ozet, soru, signal, onText) {
+    const r = await fetch(API.url + '/yorum', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cihaz: cihazId, ozet, soru }), signal });
+    if (!r.ok || !r.body) throw await apiHata(r);
+    const k = r.headers.get('X-Kalan'); if (k != null && API.kalan) API.kalan.yorum = Number(k);
+    const rd = r.body.getReader(), dec = new TextDecoder(); let text = '';
+    for (;;) { const { done, value } = await rd.read(); if (done) break; text += dec.decode(value, { stream: true }); onText({ text }); }
+    if (!text.trim()) { const er = new Error('Yorum boş geldi; tekrar dene.'); er.code = 'api'; throw er; }
+    return { text };
+  }
+  // Screenshots are shrunk on the phone before upload: faster, and cheaper to read.
+  async function gorselHazirla(file) {
+    const bmp = await createImageBitmap(file);
+    const s = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return { tip: 'image/jpeg', veri: c.toDataURL('image/jpeg', 0.86).split(',')[1] };
+  }
+  async function apiOku(files, signal) {
+    const gorseller = []; for (const f of files.slice(0, 4)) gorseller.push(await gorselHazirla(f));
+    const r = await fetch(API.url + '/oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cihaz: cihazId, gorseller }), signal });
+    if (!r.ok) throw await apiHata(r);
+    if (API.kalan) API.kalan.oku = Math.max(0, (API.kalan.oku || 1) - 1);
+    return r.json();
+  }
+  const aiVar = () => STANDALONE ? !!API.url : !!(S.sample && !S.sampleDenied);
+  const gorselVar = () => !STANDALONE || !!API.url;
   const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 2000, hedef: { kuresel: 30, bist: 30, kira: 30, altin: 10 }, pozisyonlar: [] });
   const S = {
     loaded: false, mode: 'yukleniyor', db: null, uid: null, sample: null, imgLim: null, dl: null, ortakKur: null, ortakAltin: null,
@@ -560,6 +595,7 @@ button { cursor: pointer; }
     try { const perms = await use('permissions'); if (perms) S.sampleDenied = (await perms.state('sample')) === 'denied'; } catch (e) {}
     S.db = db;
     const uid = user ? await user.id() : null;
+    await apiYukle();
     S.ortakKur = await readOrtakKur();
     S.ortakAltin = await readOrtak('altin');
 
@@ -664,7 +700,7 @@ button { cursor: pointer; }
   /* ---------- screens ---------- */
   function onboarding() {
     const kids = [el('b', { text: 'Portföyünü ekleyerek başla' }), el('p', { text: 'Midas\'taki portföy ekranının görüntüsünü yükle; varlıkların otomatik okunsun. İstersen tek tek de ekleyebilirsin.' })];
-    if (!STANDALONE) kids.push(iconBtn('image', 'Ekran görüntüsü yükle', '', () => pickImages()));
+    if (gorselVar()) kids.push(iconBtn('image', 'Ekran görüntüsü yükle', '', () => pickImages()));
     kids.push(el('button', { class: 'btn ghost', type: 'button', text: 'Elle varlık ekle', onclick: () => editSheet(null) }));
     return card(null, el('div', { class: 'onb' }, kids));
   }
@@ -792,7 +828,7 @@ button { cursor: pointer; }
       ]);
     });
     return [varlikPasta(t), ...kartlar,
-      el('div', { class: 'btns' }, [STANDALONE ? null : iconBtn('image', 'Görüntüden', 'ghost', () => pickImages()), el('button', { class: 'btn ghost', type: 'button', style: STANDALONE ? 'grid-column:1/-1' : '', text: '+ Altın ekle', onclick: () => editSheet(null, { grup: 'altin', altinTur: 'gram' }) }),
+      el('div', { class: 'btns' }, [gorselVar() ? iconBtn('image', 'Görüntüden', 'ghost', () => pickImages()) : null, el('button', { class: 'btn ghost', type: 'button', style: gorselVar() ? '' : 'grid-column:1/-1', text: '+ Altın ekle', onclick: () => editSheet(null, { grup: 'altin', altinTur: 'gram' }) }),
         el('button', { class: 'btn', type: 'button', text: '+ Varlık ekle', onclick: () => editSheet(null), style: 'grid-column:1/-1' })]),
       el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Bir varlığa dokun; değiştirdiğin her şey otomatik kaydedilir.' }),
       kurCard(), altinCard()];
@@ -983,7 +1019,7 @@ button { cursor: pointer; }
       inp('e-maliyet', 'Ortalama maliyet', fv(d.maliyet), { type: 'text', inputmode: 'decimal', full: true }),
       el('label', { class: 'chk full', for: 'e-say' }, [countBox, el('span', { text: 'Maliyetteki artışı bu ayın eklemesine say (yeni alım yaptıysan açık bırak; sadece düzeltme yapıyorsan kapat)' })])
     ]);
-    const top = STANDALONE ? null : iconBtn('image', 'Ekran görüntüsünden doldur', 'ghost', () => { clearTimeout(timer); sh.close(); pickImages(); });
+    const top = !gorselVar() ? null : iconBtn('image', 'Ekran görüntüsünden doldur', 'ghost', () => { clearTimeout(timer); sh.close(); pickImages(); });
     editing = true;
     const sh = openSheet(isNew ? (d.altinTur ? 'Altın ekle' : 'Yeni varlık') : (d.altinTur && AN[d.altinTur] ? AN[d.altinTur].n : d.kod), [top, form, status, el('button', { type: 'button', class: 'btn', text: 'Bitti', onclick: async () => { clearTimeout(timer); await doSave(); sh.close(); } }), delBtn], () => { editing = false; clearTimeout(timer); render(); });
     if (goldMode) {
@@ -998,6 +1034,7 @@ button { cursor: pointer; }
   /* ---------- screenshot import ---------- */
   function pickImages() {
     if (!S.riza) { rizaIste(pickImages); return; }
+    if (STANDALONE) { if (!API.url) { toast('Görüntü okuma şu an kullanılamıyor.'); return; } if (API.kalan && API.kalan.oku === 0) { toast('Bugünkü görüntü okuma hakkın doldu; yarın tekrar dene.'); return; } const f = document.getElementById('imgPick'); f.value = ''; f.click(); return; }
     if (!S.sample || S.sampleDenied) { connectSheet('Ekran görüntüsünü okumak için uygulamanın Claude\'u kullanmasına izin vermen gerekiyor.'); return; }
     const f = document.getElementById('imgPick'); if (S.imgLim && S.imgLim.mediaTypes) f.accept = S.imgLim.mediaTypes.join(','); f.value = ''; f.click();
   }
@@ -1047,11 +1084,13 @@ Kurallar:
     const stat = el('div', { class: 'status', text: 'Ekran görüntüsü okunuyor… Bu 10–40 saniye sürebilir.' });
     const sh = openSheet('Görüntüden okuma', [el('div', { class: 'dropzone' }, [icon('image'), el('div', { text: files.length + ' görüntü seçildi' }), stat]), el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => { ctl.abort(); sh.close(); } })]);
     let res;
-    try { res = await S.sample.json(PROMPT, { images: files, signal: ctl.signal }); }
+    try { res = STANDALONE ? await apiOku(files, ctl.signal) : await S.sample.json(PROMPT, { images: files, signal: ctl.signal }); }
     catch (e) {
       if (e && e.code === 'cancelled') return;
       let msg = { not_granted: 'Görüntü okuma için izin verilmedi.', rate_limited: 'Şu an çok fazla istek var; biraz sonra tekrar dene.', image_rejected: 'Bu görüntü okunamadı; başka bir ekran görüntüsü dene.', invalid_json: 'Görüntüden varlık listesi çıkarılamadı; daha net bir ekran görüntüsü dene.', session_expired: 'Oturumun kapanmış; claude.ai\'ye tekrar giriş yap.', images_unavailable: 'Bu görünümde görüntü okunamıyor.' }[e && e.code] || 'Okuma tamamlanamadı; tekrar dene.';
       if (e && (e.code === 'not_granted' || e.code === 'session_expired')) { S.sampleDenied = true; sh.close(); render(); connectSheet(msg + ' Tekrar denemek için Claude ile bağla.'); return; }
+      if (e && e.name === 'AbortError') return;
+      if (e && e.code === 'api') msg = e.message;
       if (e && e.code === 'images_unavailable') msg = 'Bu uygulama görünümünde görüntü gönderilemiyor. Sayfayı tarayıcıda (claude.ai) açıp tekrar dene.';
       stat.textContent = msg; stat.className = 'status warn'; return;
     }
@@ -1132,6 +1171,14 @@ Kurallar:
       else connectNow(claudeBtn);
     });
     const devamBtn = el('button', { class: 'btn ghost', type: 'button', text: 'Hesapsız devam et', onclick: () => { setGiris('cihaz'); render(); } });
+    if (STANDALONE && API.url) return [el('div', { class: 'gate' }, [
+      mark,
+      el('h1', { text: 'Portföyün tek defterde' }),
+      el('p', { class: 'lead', text: 'Midas\'taki hisse, fon ve altınlarını takip et; her ay ne kadar, nereye ekleyeceğini gör.' }),
+      el('div', { class: 'door primary' }, [el('b', { text: 'Hesap gerekmez' }), el('ul', {}, [el('li', { text: 'Tüm takip özellikleri, canlı kur ve altın' }), el('li', { text: 'Claude portföyünü yorumlar (günlük sınırlı)' }), el('li', { text: 'Ekran görüntüsünden varlıklarını okur' }), el('li', { text: 'Verilerin sadece bu telefonda kalır' })]),
+        el('button', { class: 'btn', type: 'button', text: 'Başla', onclick: () => { setGiris('cihaz'); render(); } })]),
+      el('p', { class: 'fine' }, ['Yatırım tavsiyesi değildir; kararlar sana aittir. ', lnk('sartlar'), ' · ', lnk('kvkk', 'KVKK')])
+    ])];
     return [el('div', { class: 'gate' }, [
       mark,
       el('h1', { text: 'Portföyün tek defterde' }),
@@ -1188,12 +1235,14 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     AI.busy = true; AI.err = ''; AI.text = ''; AI.soru = soru || ''; AI.ctl = new AbortController(); render();
     const input = AI_TALIMAT + (soru ? '\n\nKişinin sorusu (önce buna odaklan, sonra kısaca diğer bölümlere değin; toplam 300 kelimeyi geçme): ' + soru : '') + '\n\nPORTFÖY:\n' + portfoyOzeti();
     try {
-      const r = await S.sample(input, { signal: AI.ctl.signal, cache: false, onText: ({ text }) => { AI.text = text; const box = document.getElementById('aiBox'); if (box) { box.textContent = ''; box.append(renderMd(text)); } } });
+      const onText = ({ text }) => { AI.text = text; const box = document.getElementById('aiBox'); if (box) { box.textContent = ''; box.append(renderMd(text)); } };
+      const r = STANDALONE ? await apiYorum(portfoyOzeti(), soru || '', AI.ctl.signal, onText) : await S.sample(input, { signal: AI.ctl.signal, cache: false, onText });
       AI.text = r.text;
       S.p.sonYorum = { metin: r.text, tarih: new Date().toISOString(), soru: soru || '' };
       await savePort();
     } catch (e) {
-      if (e && e.code === 'cancelled') { AI.err = ''; }
+      if (e && (e.code === 'cancelled' || e.name === 'AbortError')) { AI.err = ''; }
+      else if (e && e.code === 'api') AI.err = e.message;
       else if (e && (e.code === 'not_granted' || e.code === 'session_expired' || e.code === 'sampling_disabled')) { S.sampleDenied = true; AI.err = 'Claude erişimine izin verilmedi. Aşağıdan bağlanabilirsin.'; }
       else if (e && e.code === 'rate_limited') AI.err = 'Claude kullanım sınırına ulaşıldı; biraz sonra tekrar dene.';
       else AI.err = 'Yorum tamamlanamadı; tekrar dene.';
@@ -1202,7 +1251,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     AI.busy = false; render();
   }
   function scrYorum() {
-    if (STANDALONE || !S.sample || S.sampleDenied) {
+    if (!aiVar()) {
       const kids = [el('b', { text: STANDALONE ? 'Claude yorumu claude.ai sürümünde' : 'Claude ile giriş gerekli' }), el('p', { text: STANDALONE ? 'Bu uygulama claude.ai hesabına bağlanamaz. Claude yorumu için claude.ai\'deki Portföy Defteri\'ni aç, orada giriş yap ve o sekmede kullan. Yorumlar kendi Claude kullanım hakkından harcanır.' : 'Claude portföyünü yorumlayıp hedefine göre neler ekleyebileceğini anlatır. Bunun için claude.ai hesabınla giriş yapman gerekiyor; yorumlar kendi Claude kullanım hakkından harcanır.' })];
       if (STANDALONE) {
         kids.push(el('a', { class: 'btn', href: CLAUDE_URL, target: '_blank', rel: 'noopener', style: 'text-decoration:none;display:block', text: 'claude.ai sürümünü aç' }));
@@ -1222,7 +1271,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       : el('button', { class: 'btn', type: 'button', text: metin ? 'Yeniden yorumla' : 'Portföyümü yorumla', onclick: () => yorumla('') });
     const q = el('input', { id: 'aiSoru', type: 'text', placeholder: 'ör. Altın payımı artırmalı mıyım?', 'aria-label': 'Claude\'a soru', disabled: AI.busy ? 'disabled' : false, onkeydown: (e) => { if (e.key === 'Enter' && e.target.value.trim()) yorumla(e.target.value.trim()); } });
     const ask = el('div', { class: 'ask' }, [q, el('button', { class: 'btn sm', type: 'button', text: 'Sor', disabled: AI.busy ? 'disabled' : false, onclick: () => { const v = q.value.trim(); if (v) yorumla(v); else toast('Önce sorunu yaz.'); } })]);
-    const head = el('div', { class: 'ai-meta' }, [AI.soru || (S.p.sonYorum && S.p.sonYorum.soru && !AI.busy && !AI.text) ? 'Soru: ' + (AI.soru || S.p.sonYorum.soru) + ' · ' : '', tarih ? trTime(tarih) : '']);
+    const head = el('div', { class: 'ai-meta' }, [AI.soru || (S.p.sonYorum && S.p.sonYorum.soru && !AI.busy && !AI.text) ? 'Soru: ' + (AI.soru || S.p.sonYorum.soru) + ' · ' : '', tarih ? trTime(tarih) : '', STANDALONE && API.kalan ? (tarih ? ' · ' : '') + 'Bugün kalan yorum hakkın: ' + API.kalan.yorum : '']);
     return [
       card('Claude yorumu', [head, el('div', { style: 'height:6px' }), box, AI.err ? el('div', { class: 'warn', style: 'margin-top:10px', text: AI.err }) : null]),
       main,
@@ -1332,7 +1381,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   /* ---------- launch consent and legal texts ----------
      Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
      The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
-  const YASAL_SURUM = '14 Ekim 2026';
+  const YASAL_SURUM = '15 Ekim 2026';
   const SORUMLU = 'Portföy Defteri geliştiricisi';
   const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
   S.onay = false; S.riza = false;
@@ -1376,7 +1425,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['p', SPK_NOTU],
       ['p', 'Ayrıntılar Risk Bildirimi\'nde yer alır ve bu şartların parçasıdır.'],
       ['h', '4. Yapay zekâ içerikleri'],
-      ['p', 'Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma özellikleri Anthropic PBC\'nin hizmetini senin claude.ai hesabınla kullanır. Bu özellikler isteğe bağlıdır, açık rıza vermeden çalışmaz ve kullanımları kendi Claude kullanım hakkından düşer. Üretilen içerik hatalı olabilir; doğrulamadan işlem yapma. Ekran görüntüsünden okunan rakamları kaydetmeden önce kontrol et.'],
+      ['p', 'Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma özellikleri Anthropic PBC\'nin yapay zekâ hizmetini kullanır. claude.ai sürümünde senin claude.ai hesabınla çalışır ve kendi kullanım hakkından düşer. Uygulama sürümünde Geliştiricinin Cloudflare üzerindeki ara sunucusu ve API hesabı üzerinden ücretsiz sunulur; kişi başı günlük kullanım sınırlıdır ve bu sınır önceden haber verilmeden değiştirilebilir. Bu özellikler isteğe bağlıdır ve açık rıza vermeden çalışmaz. Üretilen içerik hatalı olabilir; doğrulamadan işlem yapma. Ekran görüntüsünden okunan rakamları kaydetmeden önce kontrol et.'],
       ['h', '5. Senin yükümlülüklerin'],
       ['ul', [
         '18 yaşından büyük olmalısın.',
@@ -1401,7 +1450,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['ul', [
         'Hesapsız (GitHub) sürümde girdiğin portföy bilgileri yalnızca kendi cihazındaki tarayıcı depolamasında tutulur. Geliştiriciye ya da bir sunucuya gönderilmez; Geliştirici bu verileri göremez.',
         'claude.ai sürümünde veriler senin claude.ai hesabına bağlı alanda, Anthropic\'in sunucularında tutulur. Geliştirici bu verilere Uygulama üzerinden erişmez, satmaz, reklam için kullanmaz.',
-        'Claude özelliklerini kullanırsan portföy bilgilerin yorum üretmek için Anthropic\'e (ABD) gönderilir. Bu yalnızca açık rıza verirsen olur.'
+        'Claude özelliklerini kullanırsan portföy bilgilerin yorum üretmek için Anthropic\'e (ABD) gönderilir. Uygulama sürümünde bu gönderim Geliştiricinin Cloudflare üzerindeki ara sunucusundan geçer; ara sunucu portföy bilgilerini, ekran görüntülerini ve soruları saklamaz, kayıt (log) tutmaz. Bu yalnızca açık rıza verirsen olur.'
       ]],
       ['h', 'İşlenen veriler'],
       ['ul', [
@@ -1409,6 +1458,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
         'Görsel: portföy ekranından yüklediğin ekran görüntüleri (yalnızca okuma için gönderilir; Uygulama görüntüyü saklamaz).',
         'Claude\'a yazdığın sorular ve üretilen son yorum.',
         'claude.ai sürümünde claude.ai\'nin Uygulamaya verdiği kullanıcı kimliği.',
+        'Uygulama sürümünde Claude özelliklerini kullanırsan: cihazında rastgele oluşturulan bir kimlik ve IP adresinin tek yönlü özeti; yalnızca günlük kullanım sınırını saymak için tutulur ve en geç iki gün içinde silinir.',
         'Teknik bilgiler: sayfa, fiyat dosyası ve yazı tipleri yüklenirken IP adresin ve tarayıcı bilgilerin GitHub ve Google sunucularına iletilir.',
         'Onay kaydı: son onay tarihin, onayladığın metin sürümü ve açık rıza durumun (yalnızca cihazında).'
       ]],
@@ -1426,7 +1476,8 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['ul', [
         'Anthropic PBC (ABD): claude.ai sürümünde verilerin saklanması; açık rızan varsa Claude yorumu, soru ve ekran görüntüsü okuma.',
         'GitHub, Inc. (ABD): Uygulamanın ve fiyat dosyasının barındırılması (teknik bilgiler).',
-        'Google LLC (ABD): yazı tiplerinin yüklenmesi (teknik bilgiler).'
+        'Google LLC (ABD): yazı tiplerinin yüklenmesi (teknik bilgiler).',
+        'Cloudflare, Inc. (ABD): uygulama sürümünde Claude isteklerini Anthropic\'e ileten ara sunucunun barındırılması (açık rızan varsa).'
       ]],
       ['p', 'Yurt dışına aktarım KVKK md. 9 çerçevesinde yapılır. Uygulamanın çalışması için zorunlu olmayan Claude özellikleri açık rızana bağlıdır; rıza vermezsen bu özellikler kapalı kalır, diğer her şey çalışır.'],
       ['h', 'Saklama süresi'],
@@ -1447,7 +1498,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     riza: { t: 'Açık Rıza Metni', b: [
       ['p', 'Bu rıza isteğe bağlıdır. Vermezsen Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma kapalı kalır; Uygulamanın diğer bütün özellikleri çalışır.'],
       ['h', 'Rıza verdiğin işlem'],
-      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; Claude özelliklerini kullandığımda portföy bilgilerimin (varlık kodları ve adları, adet, değer, maliyet, kâr/zarar, hedef oranlar, aylık ekleme tutarı), yüklediğim ekran görüntülerinin ve Claude\'a yazdığım soruların, yorum üretilmesi ve görüntüdeki varlıkların okunması amacıyla Anthropic PBC\'ye (Amerika Birleşik Devletleri) aktarılmasına ve orada işlenmesine açık rıza veriyorum.'],
+      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; Claude özelliklerini kullandığımda portföy bilgilerimin (varlık kodları ve adları, adet, değer, maliyet, kâr/zarar, hedef oranlar, aylık ekleme tutarı), yüklediğim ekran görüntülerinin ve Claude\'a yazdığım soruların, yorum üretilmesi ve görüntüdeki varlıkların okunması amacıyla, uygulama sürümünde Cloudflare, Inc. (ABD) üzerindeki ara sunucu aracılığıyla, Anthropic PBC\'ye (Amerika Birleşik Devletleri) aktarılmasına ve orada işlenmesine açık rıza veriyorum.'],
       ['h', 'Geri çekme'],
       ['p', 'Rızanı istediğin an Geçmiş → Yasal metinler bölümünden geri çekebilirsin. Geri çekme ileriye dönük sonuç doğurur; daha önce gönderilmiş veriler için Anthropic\'in gizlilik politikası geçerlidir.']
     ] }

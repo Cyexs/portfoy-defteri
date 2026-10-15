@@ -1,5 +1,5 @@
 // Portföy Defteri: keeps the app usable offline. Prices are fetched fresh when online.
-const CACHE = 'portfoy-defteri-v8';
+const CACHE = 'portfoy-defteri-v9';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192-v2.png', 'icons/icon-512-v2.png', 'icons/apple-touch-icon-v2.png', 'icons/icon-maskable-512-v2.png', 'icons/favicon-64-v2.png'];
 
 self.addEventListener('install', (e) => {
@@ -13,9 +13,11 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
+  // Other sites (the API) are never cached; fonts are the only outside files kept for offline use.
+  if (url.origin !== location.origin && !url.hostname.endsWith('gstatic.com') && !url.hostname.endsWith('googleapis.com')) return;
   // Prices: always try the network first, fall back to the last copy.
-  if (url.pathname.endsWith('fiyatlar.json')) {
-    e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('fiyatlar.json', copy)); return r; }).catch(() => caches.match('fiyatlar.json')));
+  if (url.pathname.endsWith('fiyatlar.json') || url.pathname.endsWith('api.json')) {
+    e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(url.pathname.endsWith('api.json') ? 'api.json' : 'fiyatlar.json', copy)); return r; }).catch(() => caches.match(url.pathname.endsWith('api.json') ? 'api.json' : 'fiyatlar.json')));
     return;
   }
   // Manifest: network first so a new name or icon reaches the home screen.
