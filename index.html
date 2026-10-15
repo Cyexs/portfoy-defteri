@@ -1125,10 +1125,10 @@ Kurallar:
   function gateScreen() {
     const mark = el('div', { class: 'mark', 'aria-hidden': 'true' });
     mark.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="#6E9CF0" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-0.50" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#EA7C62" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-14.64" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#3FBF9C" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-28.77" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#E0B547" stroke-width="2.4" stroke-dasharray="3.71 47.12" stroke-dashoffset="-42.91" transform="rotate(-90 12 12)"/><text x="12.15" y="15.6" text-anchor="middle" font-family="Young Serif, Georgia, serif" font-size="10.5" fill="#EEF2EF">P</text></svg>';
-    const claudeBtn = el('button', { class: 'btn', type: 'button', text: STANDALONE ? 'Claude ile giriş yap' : 'Claude ile bağla' });
+    const claudeBtn = el('button', { class: 'btn', type: 'button', text: STANDALONE ? 'claude.ai sürümünü aç' : 'Claude ile bağla' });
     claudeBtn.addEventListener('click', () => {
       if (!S.riza) { rizaIste(() => claudeBtn.click()); return; }
-      if (STANDALONE) { setGiris('claude'); const a = el('a', { href: CLAUDE_URL, target: '_blank', rel: 'noopener' }); document.body.append(a); a.click(); a.remove(); render(); }
+      if (STANDALONE) { const a = el('a', { href: CLAUDE_URL, target: '_blank', rel: 'noopener' }); document.body.append(a); a.click(); a.remove(); render(); }
       else connectNow(claudeBtn);
     });
     const devamBtn = el('button', { class: 'btn ghost', type: 'button', text: 'Hesapsız devam et', onclick: () => { setGiris('cihaz'); render(); } });
@@ -1136,7 +1136,7 @@ Kurallar:
       mark,
       el('h1', { text: 'Portföyün tek defterde' }),
       el('p', { class: 'lead', text: 'Midas\'taki hisse, fon ve altınlarını takip et; her ay ne kadar, nereye ekleyeceğini gör.' }),
-      el('div', { class: 'door primary' }, [el('b', { text: 'claude.ai hesabınla' }), el('ul', {}, [el('li', { text: 'Claude portföyünü yorumlar, neler ekleyebileceğini anlatır' }), el('li', { text: 'Ekran görüntüsünden varlıklarını okur' }), el('li', { text: 'Verilerin hesabında saklanır (mümkünse)' })]), claudeBtn,
+      el('div', { class: 'door primary' }, [el('b', { text: 'claude.ai hesabınla' }), STANDALONE ? el('p', { class: 'small muted', style: 'margin:0', text: 'Bu uygulama claude.ai hesabına bağlanamaz. Claude özellikleri claude.ai\'deki sürümde çalışır; düğme o sürümü tarayıcıda açar. Giriş yaptıktan sonra o sekmede kal, buraya dönme.' }) : null, el('ul', {}, [el('li', { text: 'Claude portföyünü yorumlar, neler ekleyebileceğini anlatır' }), el('li', { text: 'Ekran görüntüsünden varlıklarını okur' }), el('li', { text: 'Verilerin hesabında saklanır (mümkünse)' })]), claudeBtn,
         el('p', { class: 'fine', style: 'text-align:left' }, ['Hesabın yoksa ', el('a', { href: 'https://claude.ai/login', target: '_blank', rel: 'noopener', text: 'claude.ai\'de ücretsiz oluştur' }), '. Yorumlar kendi Claude kullanım hakkından harcanır.'])]),
       el('div', { class: 'door' }, [el('b', { text: 'Hesapsız' }), el('ul', {}, [el('li', { text: 'Tüm takip özellikleri, canlı kur ve altın' }), el('li', { text: 'Verilerin sadece bu telefonda kalır' })]), devamBtn]),
       el('p', { class: 'fine' }, ['Yatırım tavsiyesi değildir; kararlar sana aittir. ', lnk('sartlar'), ' · ', lnk('kvkk', 'KVKK')])
@@ -1203,10 +1203,10 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   }
   function scrYorum() {
     if (STANDALONE || !S.sample || S.sampleDenied) {
-      const kids = [el('b', { text: 'Claude ile giriş gerekli' }), el('p', { text: 'Claude portföyünü yorumlayıp hedefine göre neler ekleyebileceğini anlatır. Bunun için claude.ai hesabınla giriş yapman gerekiyor; yorumlar kendi Claude kullanım hakkından harcanır.' })];
+      const kids = [el('b', { text: STANDALONE ? 'Claude yorumu claude.ai sürümünde' : 'Claude ile giriş gerekli' }), el('p', { text: STANDALONE ? 'Bu uygulama claude.ai hesabına bağlanamaz. Claude yorumu için claude.ai\'deki Portföy Defteri\'ni aç, orada giriş yap ve o sekmede kullan. Yorumlar kendi Claude kullanım hakkından harcanır.' : 'Claude portföyünü yorumlayıp hedefine göre neler ekleyebileceğini anlatır. Bunun için claude.ai hesabınla giriş yapman gerekiyor; yorumlar kendi Claude kullanım hakkından harcanır.' })];
       if (STANDALONE) {
-        kids.push(el('a', { class: 'btn', href: CLAUDE_URL, target: '_blank', rel: 'noopener', style: 'text-decoration:none;display:block', text: 'Claude ile giriş yap' }));
-        kids.push(el('p', { class: 'fine', text: 'Verilerini taşımak için önce Geçmiş → Yedek indir, sonra Claude sürümünde Yedekten yükle.' }));
+        kids.push(el('a', { class: 'btn', href: CLAUDE_URL, target: '_blank', rel: 'noopener', style: 'text-decoration:none;display:block', text: 'claude.ai sürümünü aç' }));
+        kids.push(el('p', { class: 'fine', text: 'Varlıklarını oraya taşımak için önce burada Geçmiş → Yedek indir, sonra claude.ai sürümünde Geçmiş → Yedekten yükle. İki sürümün verileri birbirine kendiliğinden geçmez.' }));
       } else kids.push(...connectBody().slice(1));
       return [card('Claude yorumu', el('div', { class: 'lock' }, kids))];
     }
