@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Portföy">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
@@ -228,8 +229,8 @@ button { cursor: pointer; }
 
 /* v3: sign-in gate and Claude review */
 .gate { min-height: calc(100vh - 140px); display: grid; align-content: center; gap: 18px; padding-block: 12px 32px; }
-.gate .mark { width: 64px; height: 64px; border-radius: 18px; background: var(--ink); display: grid; place-items: center; }
-.gate .mark svg { width: 36px; height: 36px; }
+.gate .mark { width: 64px; height: 64px; border-radius: 18px; background: #15241F; display: grid; place-items: center; }
+.gate .mark svg { width: 44px; height: 44px; }
 .gate h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 8vw, 38px); line-height: 1.1; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
 .gate .lead { color: var(--ink-2); font-size: 15.5px; margin: 0; max-width: 32rem; }
 .door { display: grid; gap: 10px; padding: 18px; border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
@@ -1123,7 +1124,7 @@ Kurallar:
   const needsGate = () => S.loaded && !girisSecimi() && !(!STANDALONE && (S.mode === 'bulut' || connected()));
   function gateScreen() {
     const mark = el('div', { class: 'mark', 'aria-hidden': 'true' });
-    mark.innerHTML = '<svg viewBox="0 0 24 24"><rect x="4" y="14" width="3" height="6" rx="1.2" fill="#2F66C9"/><rect x="8.6" y="11" width="3" height="9" rx="1.2" fill="#C9533A"/><rect x="13.2" y="8" width="3" height="12" rx="1.2" fill="#0D8A6E"/><rect x="17.8" y="5" width="3" height="15" rx="1.2" fill="#B98A1F"/><circle cx="7" cy="7" r="2.6" fill="none" stroke="#3FBF9C" stroke-width="1.6"/></svg>';
+    mark.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="#6E9CF0" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-0.50" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#EA7C62" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-14.64" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#3FBF9C" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-28.77" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#E0B547" stroke-width="2.4" stroke-dasharray="3.71 47.12" stroke-dashoffset="-42.91" transform="rotate(-90 12 12)"/><text x="12.15" y="15.6" text-anchor="middle" font-family="Young Serif, Georgia, serif" font-size="10.5" fill="#EEF2EF">P</text></svg>';
     const claudeBtn = el('button', { class: 'btn', type: 'button', text: STANDALONE ? 'Claude ile giriş yap' : 'Claude ile bağla' });
     claudeBtn.addEventListener('click', () => {
       if (!S.riza) { rizaIste(() => claudeBtn.click()); return; }
@@ -1462,8 +1463,8 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   const lnk = (k, text) => el('button', { class: 'lnk', type: 'button', text: text || DOCS[k].t, onclick: (e) => { e.preventDefault(); e.stopPropagation(); docSheet(k); } });
 
   function onayScreen() {
-    const mark = el('div', { class: 'mark', 'aria-hidden': 'true', style: 'width:56px;height:56px;border-radius:16px;background:var(--ink);display:grid;place-items:center' });
-    mark.innerHTML = '<svg viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="14" width="3" height="6" rx="1.2" fill="#2F66C9"/><rect x="8.6" y="11" width="3" height="9" rx="1.2" fill="#C9533A"/><rect x="13.2" y="8" width="3" height="12" rx="1.2" fill="#0D8A6E"/><rect x="17.8" y="5" width="3" height="15" rx="1.2" fill="#B98A1F"/></svg>';
+    const mark = el('div', { class: 'mark', 'aria-hidden': 'true', style: 'width:56px;height:56px;border-radius:16px;background:#15241F;display:grid;place-items:center' });
+    mark.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><circle cx="12" cy="12" r="7.5" fill="none" stroke="#6E9CF0" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-0.50" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#EA7C62" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-14.64" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#3FBF9C" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-28.77" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#E0B547" stroke-width="2.4" stroke-dasharray="3.71 47.12" stroke-dashoffset="-42.91" transform="rotate(-90 12 12)"/><text x="12.15" y="15.6" text-anchor="middle" font-family="Young Serif, Georgia, serif" font-size="10.5" fill="#EEF2EF">P</text></svg>';
     const devam = el('button', { class: 'btn', type: 'button', text: 'Onaylıyorum, devam et' });
     const sync = () => { devam.disabled = !(OK.risk && OK.sart && OK.kvkk); };
     const kutu = (k, kids, opt) => {
