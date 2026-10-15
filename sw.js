@@ -1,6 +1,6 @@
 // Portföy Defteri: keeps the app usable offline. Prices are fetched fresh when online.
-const CACHE = 'portfoy-defteri-v6';
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/icon-maskable-512.png', 'icons/favicon-64.png'];
+const CACHE = 'portfoy-defteri-v7';
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192-v2.png', 'icons/icon-512-v2.png', 'icons/apple-touch-icon-v2.png', 'icons/icon-maskable-512-v2.png', 'icons/favicon-64-v2.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,6 +16,11 @@ self.addEventListener('fetch', (e) => {
   // Prices: always try the network first, fall back to the last copy.
   if (url.pathname.endsWith('fiyatlar.json')) {
     e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('fiyatlar.json', copy)); return r; }).catch(() => caches.match('fiyatlar.json')));
+    return;
+  }
+  // Manifest: network first so a new name or icon reaches the home screen.
+  if (url.pathname.endsWith('manifest.webmanifest')) {
+    e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('manifest.webmanifest', copy)); return r; }).catch(() => caches.match('manifest.webmanifest')));
     return;
   }
   // App page: network first so updates arrive, cache when offline.

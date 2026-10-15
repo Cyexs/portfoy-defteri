@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "Portföy Defteri",
   "short_name": "Portföy",
   "description": "Midas portföyünü, aylık eklemelerini, altın ve dolar kurunu takip eden kişisel portföy defteri.",
@@ -10,8 +11,8 @@
   "background_color": "#0F1513",
   "theme_color": "#15241F",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192-v2.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512-v2.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
