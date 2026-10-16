@@ -411,7 +411,9 @@ button { cursor: pointer; }
     'auth/too-many-requests': 'Çok fazla deneme yapıldı; birkaç dakika sonra tekrar dene.', 'auth/network-request-failed': 'İnternet bağlantısı yok gibi görünüyor.',
     'auth/popup-closed-by-user': 'Google girişi yarıda kaldı; tekrar dene.', 'auth/cancelled-popup-request': 'Google girişi yarıda kaldı; tekrar dene.',
     'auth/unauthorized-domain': 'Bu adres Firebase\'de izinli değil (Authentication → Settings → Authorized domains).', 'auth/operation-not-allowed': 'Bu giriş yöntemi Firebase\'de açılmamış.',
-    'auth/requires-recent-login': 'Güvenlik için çıkış yapıp yeniden giriş yap, sonra tekrar dene.'
+    'auth/requires-recent-login': 'Güvenlik için çıkış yapıp yeniden giriş yap, sonra tekrar dene.',
+    'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'Firebase ayarındaki apiKey hatalı (firebase-ayar.json).', 'auth/invalid-api-key': 'Firebase ayarındaki apiKey hatalı (firebase-ayar.json).',
+    'auth/configuration-not-found': 'Firebase\'de giriş yöntemleri açılmamış (Authentication → Sign-in method).'
   };
   const authMesaj = (e) => AUTH_HATA[e && e.code] || 'İşlem tamamlanamadı; tekrar dene.';
   function girisTamam() {
