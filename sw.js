@@ -1,5 +1,5 @@
 // Portföy Defteri: keeps the app usable offline. Prices are fetched fresh when online.
-const CACHE = 'portfoy-defteri-v15';
+const CACHE = 'portfoy-defteri-v16';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192-v2.png', 'icons/icon-512-v2.png', 'icons/apple-touch-icon-v2.png', 'icons/icon-maskable-512-v2.png', 'icons/favicon-64-v2.png'];
 // Small JSON files that change: always network first, last copy when offline.
 const TAZE = ['fiyatlar.json', 'firebase-ayar.json', 'manifest.webmanifest'];

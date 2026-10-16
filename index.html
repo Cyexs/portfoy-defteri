@@ -507,7 +507,12 @@ button { cursor: pointer; }
   async function rolYukle() {
     if (!STANDALONE || !FB.user || !FB.db) return;
     S.rolHata = '';
-    try { const r = await FB.db.doc('roller/' + FB.user.uid).get(); S.rol = r.exists ? String((r.data() || {}).rol || '').trim().toLowerCase() : ''; }
+    try {
+      const r = await FB.db.doc('roller/' + FB.user.uid).get(); const d = r.exists ? (r.data() || {}) : null;
+      const ham = d ? (d.rol ?? d.Rol ?? d.role ?? d['rol '] ?? '') : '';
+      S.rol = String(ham).replace(/["'“”]/g, '').trim().toLocaleLowerCase('tr-TR');
+      S.rolTani = d ? 'Rol kaydı bulundu. Alanlar: ' + Object.keys(d).map(k => k + ' = ' + JSON.stringify(d[k])).join(', ') : 'Bu UID için roller koleksiyonunda belge yok.';
+    }
     catch (e) { S.rol = ''; S.rolHata = e && e.code === 'permission-denied' ? 'Rol okunamadı: Firestore kuralları yayınlanmamış.' : 'Rol okunamadı (' + ((e && e.code) || 'bağlantı') + ').'; }
   }
   async function cikisYap() {
@@ -528,7 +533,8 @@ button { cursor: pointer; }
     toast('Hesabın ve tüm verilerin silindi'); setTimeout(() => location.reload(), 900);
   }
 
-  const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 2000, hedef: { kuresel: 30, bist: 30, kira: 30, altin: 10 }, pozisyonlar: [] });
+  const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 0, hedef: { kuresel: 0, bist: 0, kira: 0, altin: 0 }, pozisyonlar: [] });
+  const hedefVar = () => GR.reduce((a, g) => a + (Number(S.p.hedef && S.p.hedef[g.k]) || 0), 0) > 0;
   const S = {
     loaded: false, mode: 'yukleniyor', db: null, uid: null, sample: null, imgLim: null, dl: null, ortakKur: null, ortakAltin: null,
     p: EMPTY(), ekl: [], gec: [], tab: 'ozet', calc: null, rol: ''
@@ -858,7 +864,7 @@ button { cursor: pointer; }
       el('div', { class: 'toprow' }, [el('div', { class: 'lbl', text: 'Portföy değeri' }), has ? refresh : null]),
       el('div', { class: 'big num', text: has ? tl0(t.T) : '—' }),
       has && (usd || gr) ? el('div', { class: 'esd' }, [usd ? el('span', { text: '≈ $' + n2(usd, 0) }) : null, gr ? el('span', { text: '≈ ' + n2(gr, gr < 10 ? 2 : 1) + ' gr altın' }) : null]) : null,
-      el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })]),
+      el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, !(Number(S.p.aylik) > 0) ? null : el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })]),
       has ? el('div', { class: 'info' }, [guncelleniyor ? 'Fiyatlar güncelleniyor…' : (sg ? 'Güncellendi: ' + trTime(sg.zaman) : 'Henüz güncellenmedi') + (kurN ? ' · $1 = ₺' + n2(kurN, 2) : '') + (gram ? ' · Gram altın ₺' + n2(gram, 0) : '') + (sg && sg.eksik && sg.eksik.length ? ' · Fiyatı bulunamayan: ' + sg.eksik.join(', ') : '')]) : null
     ]);
     if (!has) return [hero, S.loaded ? onboarding() : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Defterin açılıyor' }), 'Kayıtların yükleniyor.'])), S.loaded ? connectCard() : null, hesapDavet()];
@@ -868,11 +874,11 @@ button { cursor: pointer; }
       const cur = t.T ? t.g[g.k] / t.T * 100 : 0, tgt = S.p.hedef[g.k] || 0;
       return el('div', { class: 'lg' }, [
         el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }),
-        el('span', { class: 'num small', text: '%' + n2(cur, 0) + ' / ' + tgt }),
-        el('div', { class: 'track' }, [el('i', { style: `width:${Math.min(100, cur)}%;background:${col(g.k)}` }), el('span', { class: 'tg', style: `left:calc(${tgt}% - 1px)` })])
+        el('span', { class: 'num small', text: '%' + n2(cur, 0) + (hedefVar() ? ' / ' + tgt : '') }),
+        el('div', { class: 'track' }, [el('i', { style: `width:${Math.min(100, cur)}%;background:${col(g.k)}` }), hedefVar() ? el('span', { class: 'tg', style: `left:calc(${tgt}% - 1px)` }) : null])
       ]);
     }));
-    const alloc = card('Dağılım · şu an / hedef', [el('div', { class: 'alloc' }, [donut(parts), legend]), el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Çubuktaki koyu çizgi hedef oranı gösterir.' })]);
+    const alloc = card(hedefVar() ? 'Dağılım · şu an / hedef' : 'Dağılım', [el('div', { class: 'alloc' }, [donut(parts), legend]), el('p', { class: 'small muted', style: 'margin:12px 0 0', text: hedefVar() ? 'Çubuktaki koyu çizgi hedef oranı gösterir.' : 'Hedef oranlarını Bu ay sekmesinden girersen burada karşılaştırma görünür.' })]);
 
     const rows = S.p.pozisyonlar.map(p => ({ p, kz: val(p) - cost(p) })).sort((a, b) => a.kz - b.kz);
     const worst = rows.slice(0, 3).filter(r => r.kz < 0), best = rows.slice(-3).reverse().filter(r => r.kz > 0);
@@ -988,12 +994,14 @@ button { cursor: pointer; }
     if (S.calc == null) S.calc = kalan > 0 ? kalan : aylik;
     const box = el('div', { class: 'split' });
     const draw = () => {
-      const a = Math.max(0, Number(S.calc) || 0), r = split(a); box.textContent = '';
+      box.textContent = '';
+      if (!hedefVar()) { box.append(el('div', { class: 'note', text: 'Bölüşüm için önce aşağıdaki Hedef oranlar bölümüne kendi oranlarını gir (toplam %100).' })); return; }
+      const a = Math.max(0, Number(S.calc) || 0), r = split(a);
       for (const g of GR) {
         const v = r[g.k];
         box.append(el('div', { class: 'sp' + (v <= 0 ? ' zero' : '') }, [el('span', { class: 'n', text: g.n }), el('span', { class: 't', text: tl0(v) }),
           el('div', { class: 'bar' }, [el('i', { style: `width:${a ? Math.max(0, v) / a * 100 : 0}%;background:${col(g.k)}` })]),
-          el('span', { class: 'h', text: v > 0 ? g.hint : 'Bu sefer gerek yok, hedefin üstünde' })]));
+          el('span', { class: 'h', text: v > 0 || !(a > 0) ? g.hint : 'Bu sefer gerek yok, hedefin üstünde' })]));
       }
     };
     const amountIn = el('div', { class: 'amount' }, [el('span', { text: '₺' }), el('input', { id: 'tutar', type: 'number', inputmode: 'numeric', step: '50', min: '0', value: S.calc, 'aria-label': 'Bölünecek tutar', oninput: (e) => { S.calc = e.target.value; draw(); } })]);
@@ -1059,6 +1067,7 @@ button { cursor: pointer; }
       el('div', { class: 'field', style: 'margin-top:10px' }, [el('label', { text: 'Kullanıcı kimliği (UID)' }), el('div', { class: 'ask' }, [el('div', { class: 'salt num', style: 'font-size:13px;user-select:all', text: u.uid }),
         el('button', { class: 'btn sm ghost', type: 'button', text: 'Kopyala', onclick: async () => { try { await navigator.clipboard.writeText(u.uid); toast('Kopyalandı'); } catch (e) { toast('Kopyalanamadı; metne basılı tutup kopyala.'); } } })])]),
       S.rolHata ? el('div', { class: 'warn', style: 'margin-top:8px', text: S.rolHata }) : null,
+      location.hash === '#tani' ? el('div', { class: 'note', style: 'margin-top:8px;overflow-wrap:anywhere', text: 'Tanı: ' + (S.rolHata || S.rolTani || 'rol okunmadı') + ' · okunan rol: "' + S.rol + '"' }) : null,
       dogrula,
       el('button', { class: 'btn ghost', type: 'button', text: 'Çıkış yap', style: 'margin-top:14px', onclick: () => cikisYap() })
     ]);
