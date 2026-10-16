@@ -1,10 +1,23 @@
 rules_version = '2';
-// Portföy Defteri: every person can read and write only their own notebook.
-// Paste this into Firebase Console → Firestore Database → Rules → Publish.
+// Portföy Defteri security rules.
+// Paste into Firebase Console → Firestore Database → Rules → Publish whenever this file changes.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Every person reads and writes only their own notebook.
     match /data/users/{uid}/{rest=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Roles ('sahip', later 'pro'): a person can see their own role, nobody can grant one from the app.
+    // Roles are written only from the Firebase Console (or later the payment system).
+    match /roller/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    // Owner-only screener lists, written by the GitHub price job with a service account.
+    match /sahip/{doc=**} {
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/roller/$(request.auth.uid)).data.rol == 'sahip';
+      allow write: if false;
     }
   }
 }

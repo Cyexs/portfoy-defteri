@@ -6,7 +6,8 @@ Her çalıştığında fiyatlar.json dosyasını yeniler:
             çeyrek/yarım/tam/Cumhuriyet için serbest piyasadaki ortalama oranlar.
   - piyasa: Borsa İstanbul hisseleri (TradingView, 15 dk gecikmeli), ABD hisse/ETF'leri (TradingView),
             TEFAS yatırım fonlarının son fiyatları (tefas.gov.tr), günlük % değişimler.
-  - oneriler: kriterlere uyan "incelemeye değer" BIST hisseleri ve kira/altın fonları.
+  - oneriler: kriterlere uyan "incelemeye değer" listeleri. Herkese açık dosyaya YAZILMAZ;
+    FIREBASE_SERVICE_ACCOUNT varsa yalnızca sahibin okuyabildiği Firestore belgesine (sahip/oneriler) yazılır.
   - haberler: Midas'ın son haber başlıkları (getmidas.com RSS) ve başlıkta geçen hisse kodları.
 Bir kaynağa ulaşılamazsa o bölümün önceki değeri korunur. Sadece Python standart kütüphanesi kullanılır.
 """
@@ -232,6 +233,47 @@ def midas_haberleri(bist, abd, eski_haberler):
     return haberler
 
 
+def _fs_deger(v):
+    # Python value -> Firestore REST value
+    if v is None:
+        return {"nullValue": None}
+    if isinstance(v, bool):
+        return {"booleanValue": v}
+    if isinstance(v, int):
+        return {"integerValue": str(v)}
+    if isinstance(v, float):
+        return {"doubleValue": v}
+    if isinstance(v, (list, tuple)):
+        return {"arrayValue": {"values": [_fs_deger(x) for x in v]}}
+    if isinstance(v, dict):
+        return {"mapValue": {"fields": {str(k): _fs_deger(x) for k, x in v.items()}}}
+    return {"stringValue": str(v)}
+
+
+def sahibe_yaz(oneriler, zaman):
+    """Writes the owner-only lists to Firestore; only the keys computed in this run are replaced."""
+    ham = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
+    if not ham:
+        print("FIREBASE_SERVICE_ACCOUNT yok; öneri listeleri yazılmadı (herkese açık dosyaya da konmadı).")
+        return
+    if not oneriler:
+        return
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+    bilgi = json.loads(ham)
+    kimlik = service_account.Credentials.from_service_account_info(bilgi, scopes=["https://www.googleapis.com/auth/datastore"])
+    kimlik.refresh(google.auth.transport.requests.Request())
+    veri = dict(oneriler)
+    veri["zaman"] = zaman
+    alanlar = "&".join("updateMask.fieldPaths=" + urllib.parse.quote(k) for k in veri)
+    url = f"https://firestore.googleapis.com/v1/projects/{bilgi['project_id']}/databases/(default)/documents/sahip/oneriler?{alanlar}"
+    govde = json.dumps({"fields": {k: _fs_deger(v) for k, v in veri.items()}}).encode()
+    req = urllib.request.Request(url, data=govde, method="PATCH", headers={"Authorization": "Bearer " + kimlik.token, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=40) as r:
+        r.read()
+    print("Öneri listeleri sahibe yazıldı:", ", ".join(k for k in oneriler))
+
+
 def main():
     try:
         with open(DOSYA, encoding="utf-8") as f:
@@ -264,7 +306,7 @@ def main():
 
     hatalar = {}
     piyasa = dict(eski.get("piyasa") or {})
-    oneriler = dict(eski.get("oneriler") or {})
+    oneriler = {}
     for anahtar, pazar, adet, siralama in (("bist", "turkey", 1500, "market_cap_basic"), ("abd", "america", 3000, "Value.Traded")):
         try:
             fiyat, degisim, satirlar = tradingview(pazar, adet, siralama, oranlar=(anahtar == "bist"))
@@ -293,7 +335,12 @@ def main():
         print("Fon fiyatları bugün zaten alındı.")
     piyasa["kaynak"] = {"bist": "TradingView (15 dk gecikmeli)", "abd": "TradingView", "fon": "TEFAS"}
     yeni["piyasa"] = piyasa
-    yeni["oneriler"] = oneriler
+    yeni.pop("oneriler", None)  # never public
+    try:
+        sahibe_yaz(oneriler, zaman)
+    except Exception as e:
+        print("Öneri listeleri yazılamadı:", e)
+        hatalar["oneriler"] = str(e)[:200]
     try:
         yeni["haberler"] = midas_haberleri(piyasa.get("bist") or {}, piyasa.get("abd") or {}, eski.get("haberler"))
         yeni["haberZaman"] = zaman

@@ -483,6 +483,14 @@ button { cursor: pointer; }
       el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
     ]);
   }
+  /* Roles live in roller/{uid}; the app can read its own role but never write it (see firestore.rules).
+     'sahip' unlocks the owner-only screener lists, which are stored in sahip/oneriler and readable only by the owner. */
+  const sahip = () => !STANDALONE || S.rol === 'sahip';
+  async function rolYukle() {
+    if (!STANDALONE || !FB.user || !FB.db) return;
+    try { const r = await FB.db.doc('roller/' + FB.user.uid).get(); S.rol = r.exists ? String((r.data() || {}).rol || '') : ''; } catch (e) { S.rol = ''; }
+    if (S.rol === 'sahip') { try { const o = await FB.db.doc('sahip/oneriler').get(); if (o.exists) S.oneriler = o.data(); } catch (e) {} }
+  }
   async function cikisYap() {
     try { if (FB.m && FB.auth) await FB.m.auth.signOut(FB.auth); } catch (e) {}
     try { localStorage.removeItem('pd-onay'); } catch (e) {}
@@ -504,7 +512,7 @@ button { cursor: pointer; }
   const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 2000, hedef: { kuresel: 30, bist: 30, kira: 30, altin: 10 }, pozisyonlar: [] });
   const S = {
     loaded: false, mode: 'yukleniyor', db: null, uid: null, sample: null, imgLim: null, dl: null, ortakKur: null, ortakAltin: null,
-    p: EMPTY(), ekl: [], gec: [], tab: 'ozet', calc: null
+    p: EMPTY(), ekl: [], gec: [], tab: 'ozet', calc: null, rol: ''
   };
   try { const t = localStorage.getItem('pd-tab'); if (t) S.tab = t; } catch (e) {}
 
@@ -735,6 +743,7 @@ button { cursor: pointer; }
       if (local) { S.p = { ...EMPTY(), ...local.p }; S.ekl = local.ekl || []; S.gec = local.gec || []; }
       if (!lsOk) showBanner('Bu tarayıcı veri saklamaya izin vermiyor; değişiklikler sayfa kapanınca kaybolur. Yedek indirmeyi unutma.');
     }
+    await rolYukle();
     S.loaded = true;
     if (S.ortakKur && S.p.kurKaynak !== 'elle' && S.ortakKur.tarih !== S.p.kurTarih) await applyKur(S.ortakKur, true);
     else if (S.ortakKur && !S.p.pozisyonlar.length && S.p.kurKaynak === 'elle' && !S.p.kurTarih) await applyKur(S.ortakKur, true);
@@ -970,7 +979,7 @@ button { cursor: pointer; }
       altinTipGuncelle(r);
     };
     const amountIn = el('div', { class: 'amount' }, [el('span', { text: '₺' }), el('input', { id: 'tutar', type: 'number', inputmode: 'numeric', step: '50', min: '0', value: S.calc, 'aria-label': 'Bölünecek tutar', oninput: (e) => { S.calc = e.target.value; draw(); } })]);
-    const fikirler = fikirlerCard(split(Math.max(0, Number(S.calc) || 0)));
+    const fikirler = sahip() ? fikirlerCard(split(Math.max(0, Number(S.calc) || 0))) : null;
     setTimeout(draw, 0);
     return [progCard,
       card(kalan > 0 && eklenen > 0 ? 'Kalan tutarı nasıl bölmeli?' : 'Bu ayki tutarı nasıl bölmeli?', [amountIn, el('div', { style: 'height:14px' }), box,
@@ -1602,7 +1611,7 @@ Kurallar:
       ? el('button', { class: 'btn danger', type: 'button', text: 'Hesabımı sil', onclick: (e) => confirmInline(e.currentTarget, hesabiSil, 'Hesabın ve tüm verilerin silinecek. Emin misin?') })
       : el('button', { class: 'btn danger', type: 'button', text: S.mode === 'bulut' ? 'Hesabımdaki verilerimi sil' : 'Bu cihazdaki verilerimi sil', onclick: (e) => confirmInline(e.currentTarget, verileriSil, 'Tüm varlıklar ve geçmiş silinecek. Emin misin?') });
     return card('Yasal metinler', [docs,
-      el('p', { class: 'small muted', style: 'margin:10px 0 12px', text: 'Bu oturum için onaylandı' + (son && son.zaman ? ' (' + trTime(son.zaman) + ')' : '') + (STANDALONE ? (FB.user ? ' · Hesap: ' + (FB.user.email || 'Google') : ' · Hesapsız') : ' · Claude için açık rıza: ' + (S.riza ? 'verildi' : 'verilmedi')) + ' · Sürüm ' + YASAL_SURUM }),
+      el('p', { class: 'small muted', style: 'margin:10px 0 12px', text: 'Bu oturum için onaylandı' + (son && son.zaman ? ' (' + trTime(son.zaman) + ')' : '') + (STANDALONE ? (FB.user ? ' · Hesap: ' + (FB.user.email || 'Google') + (S.rol ? ' (' + ({ sahip: 'Sahip', pro: 'Pro' }[S.rol] || S.rol) + ')' : '') : ' · Hesapsız') : ' · Claude için açık rıza: ' + (S.riza ? 'verildi' : 'verilmedi')) + ' · Sürüm ' + YASAL_SURUM }),
       el('div', { style: 'display:grid;gap:10px' }, [rizaBtn, silBtn])]);
   }
 
