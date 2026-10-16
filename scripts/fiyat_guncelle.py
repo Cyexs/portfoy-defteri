@@ -6,8 +6,7 @@ Her çalıştığında fiyatlar.json dosyasını yeniler:
             çeyrek/yarım/tam/Cumhuriyet için serbest piyasadaki ortalama oranlar.
   - piyasa: Borsa İstanbul hisseleri (TradingView, 15 dk gecikmeli), ABD hisse/ETF'leri (TradingView),
             TEFAS yatırım fonlarının son fiyatları (tefas.gov.tr), günlük % değişimler.
-  - oneriler: kriterlere uyan "incelemeye değer" listeleri. Herkese açık dosyaya YAZILMAZ;
-    FIREBASE_SERVICE_ACCOUNT varsa yalnızca sahibin okuyabildiği Firestore belgesine (sahip/oneriler) yazılır.
+  - (Öneri listeleri 16 Ekim 2026'da kaldırıldı; uygulama hisse ya da fon önermez.)
   - haberler: Midas'ın son haber başlıkları (getmidas.com RSS) ve başlıkta geçen hisse kodları.
 Bir kaynağa ulaşılamazsa o bölümün önceki değeri korunur. Sadece Python standart kütüphanesi kullanılır.
 """
@@ -78,19 +77,6 @@ def tradingview(pazar, adet, siralama, oranlar=False):
     if len(fiyat) < 50:
         raise ValueError(f"{pazar}: çok az sonuç ({len(fiyat)})")
     return fiyat, degisim, satirlar
-
-
-def bist_onerileri(satirlar):
-    """Büyük şirketler (piyasa değerine göre ilk 100) içinde F/K 2-12 ve özsermaye kârlılığı %15-%60 olanlar.
-    Çok yüksek ROE ve çok düşük F/K çoğunlukla tek seferlik kazanç veya enflasyon muhasebesi etkisidir; dışarıda bırakılır."""
-    adaylar = []
-    for d in satirlar[:100]:
-        kod, f, ch, fk, roe, pd, tv, ad = d
-        if isinstance(fk, (int, float)) and isinstance(roe, (int, float)) and 2 < fk < 12 and 15 < roe < 60:
-            adaylar.append({"kod": kod, "ad": (ad or "")[:40], "fk": round(fk, 1), "roe": round(roe, 1),
-                            "temettu": round(tv, 1) if isinstance(tv, (int, float)) else None})
-    adaylar.sort(key=lambda x: -x["roe"])
-    return adaylar[:8]
 
 
 def tefas_post(yol, govde):
@@ -233,47 +219,6 @@ def midas_haberleri(bist, abd, eski_haberler):
     return haberler
 
 
-def _fs_deger(v):
-    # Python value -> Firestore REST value
-    if v is None:
-        return {"nullValue": None}
-    if isinstance(v, bool):
-        return {"booleanValue": v}
-    if isinstance(v, int):
-        return {"integerValue": str(v)}
-    if isinstance(v, float):
-        return {"doubleValue": v}
-    if isinstance(v, (list, tuple)):
-        return {"arrayValue": {"values": [_fs_deger(x) for x in v]}}
-    if isinstance(v, dict):
-        return {"mapValue": {"fields": {str(k): _fs_deger(x) for k, x in v.items()}}}
-    return {"stringValue": str(v)}
-
-
-def sahibe_yaz(oneriler, zaman):
-    """Writes the owner-only lists to Firestore; only the keys computed in this run are replaced."""
-    ham = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
-    if not ham:
-        print("FIREBASE_SERVICE_ACCOUNT yok; öneri listeleri yazılmadı (herkese açık dosyaya da konmadı).")
-        return
-    if not oneriler:
-        return
-    from google.oauth2 import service_account
-    import google.auth.transport.requests
-    bilgi = json.loads(ham)
-    kimlik = service_account.Credentials.from_service_account_info(bilgi, scopes=["https://www.googleapis.com/auth/datastore"])
-    kimlik.refresh(google.auth.transport.requests.Request())
-    veri = dict(oneriler)
-    veri["zaman"] = zaman
-    alanlar = "&".join("updateMask.fieldPaths=" + urllib.parse.quote(k) for k in veri)
-    url = f"https://firestore.googleapis.com/v1/projects/{bilgi['project_id']}/databases/(default)/documents/sahip/oneriler?{alanlar}"
-    govde = json.dumps({"fields": {k: _fs_deger(v) for k, v in veri.items()}}).encode()
-    req = urllib.request.Request(url, data=govde, method="PATCH", headers={"Authorization": "Bearer " + kimlik.token, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=40) as r:
-        r.read()
-    print("Öneri listeleri sahibe yazıldı:", ", ".join(k for k in oneriler))
-
-
 def main():
     try:
         with open(DOSYA, encoding="utf-8") as f:
@@ -306,15 +251,12 @@ def main():
 
     hatalar = {}
     piyasa = dict(eski.get("piyasa") or {})
-    oneriler = {}
     for anahtar, pazar, adet, siralama in (("bist", "turkey", 1500, "market_cap_basic"), ("abd", "america", 3000, "Value.Traded")):
         try:
             fiyat, degisim, satirlar = tradingview(pazar, adet, siralama, oranlar=(anahtar == "bist"))
             piyasa[anahtar] = fiyat
             piyasa[anahtar + "D"] = degisim
             piyasa[anahtar + "Zaman"] = zaman
-            if anahtar == "bist":
-                oneriler["bist"] = bist_onerileri(satirlar)
             print(anahtar, len(fiyat), "fiyat")
         except Exception as e:
             print(anahtar, "okunamadı, önceki fiyatlar korunuyor:", e)
@@ -322,8 +264,7 @@ def main():
     bugun = simdi.date().isoformat()
     if piyasa.get("fonGun") != bugun or os.environ.get("TEFAS_ZORLA"):
         try:
-            fon, fon_tarih, fon_oneri = tefas()
-            oneriler.update(fon_oneri)
+            fon, fon_tarih, _ = tefas()
             piyasa["fon"] = fon
             piyasa["fonTarih"] = fon_tarih
             piyasa["fonGun"] = bugun
@@ -335,12 +276,7 @@ def main():
         print("Fon fiyatları bugün zaten alındı.")
     piyasa["kaynak"] = {"bist": "TradingView (15 dk gecikmeli)", "abd": "TradingView", "fon": "TEFAS"}
     yeni["piyasa"] = piyasa
-    yeni.pop("oneriler", None)  # never public
-    try:
-        sahibe_yaz(oneriler, zaman)
-    except Exception as e:
-        print("Öneri listeleri yazılamadı:", e)
-        hatalar["oneriler"] = str(e)[:200]
+    yeni.pop("oneriler", None)
     try:
         yeni["haberler"] = midas_haberleri(piyasa.get("bist") or {}, piyasa.get("abd") or {}, eski.get("haberler"))
         yeni["haberZaman"] = zaman

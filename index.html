@@ -351,10 +351,10 @@ button { cursor: pointer; }
 <script>
 (() => {
   const GR = [
-    { k: 'kuresel', n: 'Küresel ETF', c: '--c-kuresel', hint: 'VT veya VOO (kesirli pay)' },
-    { k: 'bist', n: 'BIST hisse', c: '--c-bist', hint: 'Mevcut hisseler veya aday listesi' },
-    { k: 'kira', n: 'Kira fonu', c: '--c-kira', hint: 'Tek fonda topla (ör. RBV)' },
-    { k: 'altin', n: 'Altın', c: '--c-altin', hint: 'KZL' }
+    { k: 'kuresel', n: 'Küresel ETF', c: '--c-kuresel', hint: 'Yurt dışı hisse ve ETF\'ler' },
+    { k: 'bist', n: 'BIST hisse', c: '--c-bist', hint: 'Borsa İstanbul hisseleri' },
+    { k: 'kira', n: 'Kira fonu', c: '--c-kira', hint: 'Kira sertifikası fonları' },
+    { k: 'altin', n: 'Altın', c: '--c-altin', hint: 'Fiziki altın, altın fonu ya da sertifika' }
   ];
   const GN = Object.fromEntries(GR.map(g => [g.k, g]));
   const ALTIN = [
@@ -502,12 +502,13 @@ button { cursor: pointer; }
     ]);
   }
   /* Roles live in roller/{uid}; the app can read its own role but never write it (see firestore.rules).
-     'sahip' unlocks the owner-only screener lists, which are stored in sahip/oneriler and readable only by the owner. */
+     'sahip' lets the owner read incoming feedback in the Hesap tab. */
   const sahip = () => !STANDALONE || S.rol === 'sahip';
   async function rolYukle() {
     if (!STANDALONE || !FB.user || !FB.db) return;
-    try { const r = await FB.db.doc('roller/' + FB.user.uid).get(); S.rol = r.exists ? String((r.data() || {}).rol || '') : ''; } catch (e) { S.rol = ''; }
-    if (S.rol === 'sahip') { try { const o = await FB.db.doc('sahip/oneriler').get(); if (o.exists) S.oneriler = o.data(); } catch (e) {} }
+    S.rolHata = '';
+    try { const r = await FB.db.doc('roller/' + FB.user.uid).get(); S.rol = r.exists ? String((r.data() || {}).rol || '').trim().toLowerCase() : ''; }
+    catch (e) { S.rol = ''; S.rolHata = e && e.code === 'permission-denied' ? 'Rol okunamadı: Firestore kuralları yayınlanmamış.' : 'Rol okunamadı (' + ((e && e.code) || 'bağlantı') + ').'; }
   }
   async function cikisYap() {
     try { if (FB.m && FB.auth) await FB.m.auth.signOut(FB.auth); } catch (e) {}
@@ -994,15 +995,12 @@ button { cursor: pointer; }
           el('div', { class: 'bar' }, [el('i', { style: `width:${a ? Math.max(0, v) / a * 100 : 0}%;background:${col(g.k)}` })]),
           el('span', { class: 'h', text: v > 0 ? g.hint : 'Bu sefer gerek yok, hedefin üstünde' })]));
       }
-      altinTipGuncelle(r);
     };
     const amountIn = el('div', { class: 'amount' }, [el('span', { text: '₺' }), el('input', { id: 'tutar', type: 'number', inputmode: 'numeric', step: '50', min: '0', value: S.calc, 'aria-label': 'Bölünecek tutar', oninput: (e) => { S.calc = e.target.value; draw(); } })]);
-    const fikirler = sahip() ? fikirlerCard(split(Math.max(0, Number(S.calc) || 0))) : null;
     setTimeout(draw, 0);
     return [progCard,
       card(kalan > 0 && eklenen > 0 ? 'Kalan tutarı nasıl bölmeli?' : 'Bu ayki tutarı nasıl bölmeli?', [amountIn, el('div', { style: 'height:14px' }), box,
         el('p', { class: 'small muted', style: 'margin:12px 0 0', text: 'Güncel değerlerine göre hedefin altında kalan gruplara öncelik verir.' })]),
-      fikirler,
       card('Hedef oranlar', hedefForm())];
   }
 
@@ -1058,6 +1056,9 @@ button { cursor: pointer; }
       ]),
       el('div', { class: 'field', style: 'margin-top:14px' }, [el('label', { for: 'h-ad', text: 'Ad Soyad' }), el('div', { class: 'ask' }, [adIn, kaydet])]),
       el('div', { class: 'field', style: 'margin-top:10px' }, [el('label', { text: 'E-posta' }), el('div', { class: 'salt', text: u.email || '—' })]),
+      el('div', { class: 'field', style: 'margin-top:10px' }, [el('label', { text: 'Kullanıcı kimliği (UID)' }), el('div', { class: 'ask' }, [el('div', { class: 'salt num', style: 'font-size:13px;user-select:all', text: u.uid }),
+        el('button', { class: 'btn sm ghost', type: 'button', text: 'Kopyala', onclick: async () => { try { await navigator.clipboard.writeText(u.uid); toast('Kopyalandı'); } catch (e) { toast('Kopyalanamadı; metne basılı tutup kopyala.'); } } })])]),
+      S.rolHata ? el('div', { class: 'warn', style: 'margin-top:8px', text: S.rolHata }) : null,
       dogrula,
       el('button', { class: 'btn ghost', type: 'button', text: 'Çıkış yap', style: 'margin-top:14px', onclick: () => cikisYap() })
     ]);
@@ -1425,82 +1426,18 @@ Kurallar:
     ])];
   }
 
-  /* ---------- ideas for this month's money, and Midas news ---------- */
-  S.oneriler = null; S.haberler = null;
+  /* ---------- Midas news ---------- */
+  S.haberler = null;
   async function yanVeri() {
-    const [o, hb] = await Promise.all([readOrtak('oneriler'), readOrtak('haberler')]);
-    if (o) S.oneriler = o;
+    const hb = await readOrtak('haberler');
     if (hb) S.haberler = Array.isArray(hb) ? hb : (hb.liste || null);
     render();
   }
-  const KURESEL_FIKIR = [
-    { kod: 'VT', ad: 'Tüm dünya hisseleri, yaklaşık 10.000 şirket', not: 'En geniş çeşitlendirme' },
-    { kod: 'VOO', ad: 'S&P 500: ABD\'nin en büyük 500 şirketi', not: 'Çok düşük maliyet' },
-    { kod: 'SCHD', ad: 'ABD temettü hisseleri', not: 'Düzenli temettü' },
-    { kod: 'VXUS', ad: 'ABD dışındaki dünya hisseleri', not: 'ABD ağırlığını dengeler' },
-    { kod: 'QQQ', ad: 'Nasdaq-100, teknoloji ağırlıklı', not: 'Daha oynak' }
-  ];
-  const ALTIN_TUYO = [
-    'Yatırım için en verimlisi has (24 ayar) gram altın. Çeyrek, yarım ve tam altında işçilik payı ve alış-satış farkı daha yüksek.',
-    'Almadan önce alış ve satış fiyatı arasındaki farka (makas) bak; satarken sana alış fiyatından ödenir. Kuyumcu, banka ve aracı kurumu karşılaştır.',
-    'Faturalı ve damgalı (ör. Darphane, İstanbul Altın Rafinerisi) ürün al. Bilezik ve takının işçiliği satarken geri alınmaz.',
-    'Saklama derdi istemiyorsan altın fonu ya da borsadaki altın sertifikası aynı fiyata bağlı ilerler.'
-  ];
   function degSpan(kod, pazar) {
     const m = S.piyasa && S.piyasa[pazar + 'D']; const d = m ? m[kod] : undefined;
     if (typeof d !== 'number') return el('span', { class: 'dg flat', text: '—' });
     return el('span', { class: 'dg ' + (d > 0.005 ? 'up' : d < -0.005 ? 'down' : 'flat'), text: (d > 0.005 ? '▲ %' : d < -0.005 ? '▼ %' : '%') + n2(Math.abs(d), 2) });
   }
-  const pf = (m, kod) => S.piyasa && S.piyasa[m] && Number(S.piyasa[m][kod]) > 0 ? Number(S.piyasa[m][kod]) : null;
-  function fikir(kod, ad, detay, sag, sag2, held) {
-    return el('div', { class: 'idea' }, [
-      el('span', { class: 'k' }, [kod, held ? el('span', { class: 'held', text: 'Portföyünde' }) : null]),
-      el('span', { class: 'r', text: sag || '' }),
-      el('span', { class: 'sub', text: ad + (detay ? ' · ' + detay : '') }),
-      el('span', { class: 'r2' }, [sag2 || ''])
-    ]);
-  }
-  function fikirlerCard(r) {
-    const held = new Set(S.p.pozisyonlar.map(p => String(p.kod).toUpperCase()));
-    const o = S.oneriler || {};
-    const sira = GR.slice().sort((a, b) => (r[b.k] || 0) - (r[a.k] || 0));
-    const yuzde = (v) => typeof v === 'number' ? '%' + n2(v, 1) : '—';
-    const bolumler = sira.map(g => {
-      const kids = [];
-      if (g.k === 'kuresel') {
-        for (const f of KURESEL_FIKIR) { const fy = pf('abd', f.kod); kids.push(fikir(f.kod, f.ad, f.not, fy ? '$' + n2(fy) : '', degSpan(f.kod, 'abd'), held.has(f.kod))); }
-      } else if (g.k === 'bist') {
-        const l = o.bist || [];
-        if (!l.length) kids.push(el('p', { class: 'small muted', style: 'margin:4px 0', text: 'Liste fiyatlar güncellenince gelir.' }));
-        for (const x of l) { const fy = pf('bist', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/\s+A\.Ş\.?$/i, ''), 'F/K ' + n2(x.fk, 1) + ' · ROE ' + yuzde(x.roe), fy ? '₺' + n2(fy) : '', degSpan(x.kod, 'bist'), held.has(x.kod))); }
-        kids.push(el('p', { class: 'small muted', style: 'margin:6px 0 0', text: 'Borsa İstanbul\'un en büyük 100 şirketi içinde F/K 2–12 ve özsermaye kârlılığı (ROE) %15–60 olanlar, ROE sırasıyla. Enflasyon muhasebesi oranları etkileyebilir.' }));
-      } else if (g.k === 'kira') {
-        const l = o.kira || [];
-        if (!l.length) kids.push(el('p', { class: 'small muted', style: 'margin:4px 0', text: 'Liste fon fiyatları güncellenince gelir.' }));
-        for (const x of l) { const fy = pf('fon', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/ (KATILIM )?\(TL\)/, '').replace(/ FONU$/, ''), 'risk ' + (x.risk || '—'), fy ? '₺' + n2(fy, 4) : '', el('span', { class: 'dg up', text: '1 yıl ' + yuzde(x.getiri1y != null ? x.getiri1y : x.getiriyb) }), held.has(x.kod))); }
-        kids.push(el('p', { class: 'small muted', style: 'margin:6px 0 0', text: 'TEFAS\'taki kira sertifikası fonları, son 1 yıllık getiriye göre. Geçmiş getiri geleceği göstermez.' }));
-      } else if (g.k === 'altin') {
-        kids.push(el('div', { class: 'tipnow', id: 'altinTip' }));
-        kids.push(el('ul', { class: 'tips' }, ALTIN_TUYO.map(t => el('li', { text: t }))));
-        const l = o.altin || [];
-        if (l.length) kids.push(el('div', { class: 'small', style: 'font-weight:700;margin-top:8px', text: 'Altın fonları' }));
-        for (const x of l) { const fy = pf('fon', x.kod); kids.push(fikir(x.kod, String(x.ad || '').replace(/ FONU$/, ''), 'risk ' + (x.risk || '—'), fy ? '₺' + n2(fy, 4) : '', el('span', { class: 'dg up', text: '1 yıl ' + yuzde(x.getiri1y != null ? x.getiri1y : x.getiriyb) }), held.has(x.kod))); }
-      }
-      return el('div', { class: 'idea-sec' }, [el('div', { class: 'idea-h' }, [el('span', { class: 'sw', style: `background:${col(g.k)}` }), el('span', { text: g.n }), el('span', { class: 'amt', id: 'amt-' + g.k, text: r[g.k] > 0 ? 'bu ay ' + tl0(r[g.k]) : 'bu ay gerek yok' })]), ...kids]);
-    });
-    return card('İncelemeye değer', [...bolumler, el('p', { class: 'small muted', style: 'margin:14px 0 0', text: 'Listeler kriterlere göre otomatik oluşur; yatırım tavsiyesi değildir. BIST fiyatları 15 dakika gecikmelidir.' })]);
-  }
-  function altinTipGuncelle(r) {
-    const e = document.getElementById('altinTip'); if (!e) return;
-    const a = r.altin || 0, g = altinFiyat('gram');
-    if (!a || !g) { e.textContent = 'Bu ay altına ayrılan tutar yok; hedefin üstündesin.'; return; }
-    const gr = a / g;
-    e.textContent = 'Bu ayki ' + tl0(a) + ' ≈ ' + n2(gr, 2) + ' gr altın. ' + (gr < 1
-      ? 'Fiziki alımda alış-satış farkı küçük tutarlarda oransal olarak büyür; birkaç ay biriktirip tek seferde gram almak ya da altın fonu kullanmak daha verimli olabilir.'
-      : 'Bu tutarla gram altın alabilirsin; kuyumcu yerine banka ve aracı kurumların gram fiyatlarını da karşılaştır.');
-    for (const gg of GR) { const am = document.getElementById('amt-' + gg.k); if (am) am.textContent = r[gg.k] > 0 ? 'bu ay ' + tl0(r[gg.k]) : 'bu ay gerek yok'; }
-  }
-
   let sadeceBenim = false;
   function scrHaber() {
     const hb = S.haberler;
@@ -1527,8 +1464,8 @@ Kurallar:
   /* ---------- launch consent and legal texts ----------
      Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
      The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
-  const YASAL_SURUM = '16 Ekim 2026 (3)';
-  const SORUMLU = 'Portföy Defteri geliştiricisi';
+  const YASAL_SURUM = '16 Ekim 2026 (4)';
+  const SORUMLU = 'Portföy Defteri geliştiricisi (GitHub: github.com/Cyexs)';
   const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
   S.onay = false; S.riza = false;
   const OK = { risk: false, sart: false, kvkk: false, riza: false };
@@ -1542,10 +1479,9 @@ Kurallar:
       ['p', 'Portföy Defteri bir kayıt ve takip aracıdır. İçindeki listeler ve hesaplamalar yatırım tavsiyesi değildir.'],
       ['h', 'Yatırım danışmanlığı değildir'], ['p', SPK_NOTU],
       ['p', 'Uygulamanın geliştiricisi Sermaye Piyasası Kurulu\'ndan (SPK) izin almış bir kurum değildir ve yatırım danışmanlığı ya da portföy yönetimi hizmeti vermez.'],
-      ['h', 'Öneriler nasıl oluşuyor?'],
+      ['h', 'Hesaplamalar nasıl yapılıyor?'],
       ['ul', [
-        '"İncelemeye değer" listeleri F/K, özsermaye kârlılığı (ROE) ve geçmiş getiri gibi sabit kriterlerle otomatik süzülür. Senin mali durumuna, hedefine ya da risk tercihine göre kişiselleştirilmez.',
-        'Aylık bölüşüm hesabı yalnızca senin girdiğin hedef oranları uygulayan bir hesap makinesidir.'
+        'Uygulama hisse, fon ya da başka bir yatırım aracı önermez. Aylık bölüşüm hesabı yalnızca senin girdiğin hedef oranları uygulayan bir hesap makinesidir.'
       ]],
       ['h', 'Yatırımın riskleri'],
       ['ul', [
