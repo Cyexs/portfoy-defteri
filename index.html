@@ -137,6 +137,7 @@ button { cursor: pointer; }
 .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.field textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-family: var(--f-body); font-size: 16px; resize: vertical; min-height: 96px; }
 .field input, .field select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-family: var(--f-num); font-size: 16px; }
 .field select, .field input[type=text] { font-family: var(--f-body); }
 .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -286,6 +287,18 @@ button { cursor: pointer; }
 .onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .warn { color: var(--bad); font-size: 12.5px; }
 .status.warn { color: var(--bad); }
+.top-r { display: flex; align-items: center; gap: 12px; }
+.hesap-btn { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink-2); display: grid; place-items: center; padding: 0; font-family: var(--f-display); font-size: 16px; flex: none; }
+.hesap-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.hesap-btn.giris { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.hesap-ust { display: flex; gap: 14px; align-items: flex-start; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-family: var(--f-display); font-size: 24px; flex: none; }
+.avatar.bos { background: var(--surface-2); color: var(--ink-2); }
+.avatar svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+.hesap-ad { font-family: var(--f-display); font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.durum { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); }
+.durum.acik { background: var(--good-bg); color: var(--good); }
+.salt { padding: 11px 12px; border-radius: 10px; background: var(--surface-2); font-size: 15px; overflow-wrap: anywhere; }
 .davet { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1.5px solid var(--accent); box-shadow: none; }
 .davet .btn { flex: none; }
 .ayrac { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 12.5px; }
@@ -316,7 +329,7 @@ button { cursor: pointer; }
 <div class="app">
   <header class="top" id="top">
     <div class="brand">Portföy Defteri</div>
-    <div class="top-total">Toplam<b id="topTotal">—</b></div>
+    <div class="top-r"><div class="top-total">Toplam<b id="topTotal">—</b></div><button class="hesap-btn" id="hesapBtn" type="button" aria-label="Hesap"></button></div>
   </header>
   <div class="banner" id="banner" hidden></div>
   <main id="main"></main>
@@ -329,6 +342,7 @@ button { cursor: pointer; }
     <button data-tab="ay"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Bu ay</button>
     <button data-tab="gecmis"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/></svg>Geçmiş</button>
     <button data-tab="haber"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>Haberler</button>
+    <button data-tab="hesap"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.4-3.8 4.3-5.8 7.5-5.8s6.1 2 7.5 5.8"/></svg>Hesap</button>
   </div>
 </nav>
 <input type="file" id="imgPick" accept="image/png,image/jpeg,image/webp" multiple hidden>
@@ -359,7 +373,8 @@ button { cursor: pointer; }
     cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z"/>',
     phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
     down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
-    up: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>'
+    up: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
+    kisi: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20c1.4-3.8 4.3-5.8 7.5-5.8s6.1 2 7.5 5.8"/>'
   };
   const icon = (n) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[n]; return s; };
 
@@ -447,15 +462,17 @@ button { cursor: pointer; }
     });
     const ep = el('input', { id: 'g-eposta', type: 'email', autocomplete: 'email', inputmode: 'email', autocapitalize: 'off', spellcheck: 'false' });
     const sf = el('input', { id: 'g-sifre', type: 'password', autocomplete: 'current-password', minlength: '6' });
-    const degerler = () => ({ e: ep.value.trim(), s: sf.value });
+    const adg = el('input', { id: 'g-ad', type: 'text', autocomplete: 'name', placeholder: 'Sadece kayıt olurken' });
+    const degerler = () => ({ e: ep.value.trim(), s: sf.value, a: adg.value.trim() });
     const epostaIle = async (kayit) => {
-      const { e, s } = degerler();
+      const { e, s, a } = degerler();
+      if (kayit && !a) { yaz('Kayıt için adını ve soyadını yaz.', 'warn'); adg.focus(); return; }
       if (!e) { yaz('E-posta adresini yaz.', 'warn'); ep.focus(); return; }
       if (!s) { yaz('Şifreni yaz.', 'warn'); sf.focus(); return; }
       if (!rizaVar()) return;
       busy(true); yaz(kayit ? 'Hesabın oluşturuluyor…' : 'Giriş yapılıyor…');
       try {
-        if (kayit) { const r = await A.createUserWithEmailAndPassword(FB.auth, e, s); try { await A.sendEmailVerification(r.user); } catch (er) {} }
+        if (kayit) { const r = await A.createUserWithEmailAndPassword(FB.auth, e, s); try { await A.updateProfile(r.user, { displayName: a }); } catch (er) {} try { await A.sendEmailVerification(r.user); } catch (er) {} }
         else await A.signInWithEmailAndPassword(FB.auth, e, s);
         girisTamam();
       } catch (er) { busy(false); yaz(authMesaj(er), 'warn'); }
@@ -471,6 +488,7 @@ button { cursor: pointer; }
       google,
       el('div', { class: 'ayrac', text: 'ya da e-postayla' }),
       el('div', { class: 'fgrid' }, [
+        el('div', { class: 'field full' }, [el('label', { for: 'g-ad', text: 'Ad Soyad (kayıt olurken)' }), adg]),
         el('div', { class: 'field full' }, [el('label', { for: 'g-eposta', text: 'E-posta' }), ep]),
         el('div', { class: 'field full' }, [el('label', { for: 'g-sifre', text: 'Şifre (en az 6 karakter)' }), sf])
       ]),
@@ -1006,6 +1024,100 @@ button { cursor: pointer; }
     return f;
   }
 
+  /* ---------- Hesap tab: who is signed in, profile, feedback, backup, legal ---------- */
+  const ROL_AD = { sahip: 'Sahip', pro: 'Pro' };
+  const basHarf = () => { const u = FB.user; const k = (u && (u.displayName || u.email)) || ''; return k ? k.trim()[0].toLocaleUpperCase('tr-TR') : ''; };
+  function hesapCard() {
+    if (!STANDALONE) return card('Hesap', [el('div', { class: 'hesap-ust' }, [el('span', { class: 'durum acik', text: 'claude.ai hesabın' }), el('p', { class: 'small muted', style: 'margin:0', text: 'Bu sürüm claude.ai hesabınla çalışıyor.' })])]);
+    if (!FB.hazir) return card('Hesap', [el('span', { class: 'durum', text: 'Hesapsız' }), el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Hesap girişi şu an kullanılamıyor; verilerin bu telefonda duruyor. İnternet bağlantını kontrol edip uygulamayı yeniden aç.' })]);
+    if (!FB.user) return card('Hesap', [
+      el('div', { class: 'hesap-ust' }, [el('div', { class: 'avatar bos', 'aria-hidden': 'true' }, [icon('kisi')]), el('div', {}, [el('span', { class: 'durum', text: 'Giriş yapmadın' }), el('p', { class: 'small muted', style: 'margin:6px 0 0', text: 'Verilerin yalnızca bu telefonda duruyor. Giriş yaparsan hesabında saklanır, telefon değişse de kaybolmaz.' })])]),
+      el('button', { class: 'btn', type: 'button', text: 'Giriş yap ya da kayıt ol', onclick: () => girisSheet() })
+    ]);
+    const u = FB.user, A = FB.m.auth;
+    const sifreli = (u.providerData || []).some(p => p.providerId === 'password');
+    const adIn = el('input', { id: 'h-ad', type: 'text', value: u.displayName || '', autocomplete: 'name', placeholder: 'Adın ve soyadın' });
+    const kaydet = el('button', { class: 'btn sm', type: 'button', text: 'Kaydet', onclick: async (e) => {
+      const v = adIn.value.trim(); if (!v) { toast('Adını ve soyadını yaz.'); adIn.focus(); return; }
+      e.currentTarget.disabled = true;
+      try { await A.updateProfile(u, { displayName: v }); adIn.blur(); toast('Adın kaydedildi'); render(); } catch (er) { toast(authMesaj(er)); }
+      if (e.currentTarget) e.currentTarget.disabled = false;
+    } });
+    const dogrula = sifreli && !u.emailVerified ? el('div', { class: 'note', style: 'display:flex;gap:10px;align-items:center;justify-content:space-between' }, [
+      el('span', { text: 'E-posta adresin henüz doğrulanmadı.' }),
+      el('button', { class: 'btn sm ghost', type: 'button', text: 'Bağlantı gönder', onclick: async () => { try { await A.sendEmailVerification(u); toast('Doğrulama bağlantısı gönderildi'); } catch (er) { toast(authMesaj(er)); } } })
+    ]) : null;
+    return card('Hesap', [
+      el('div', { class: 'hesap-ust' }, [
+        el('div', { class: 'avatar', 'aria-hidden': 'true', text: basHarf() }),
+        el('div', { style: 'min-width:0' }, [
+          el('div', { class: 'hesap-ad', text: u.displayName || 'Adını ekle' }),
+          el('div', { class: 'small muted', style: 'overflow-wrap:anywhere', text: u.email || '' }),
+          el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' }, [el('span', { class: 'durum acik', text: 'Giriş yapıldı' }), el('span', { class: 'durum', text: ROL_AD[S.rol] || 'Ücretsiz' }), el('span', { class: 'durum', text: sifreli ? 'E-posta ile' : 'Google ile' })])
+        ])
+      ]),
+      el('div', { class: 'field', style: 'margin-top:14px' }, [el('label', { for: 'h-ad', text: 'Ad Soyad' }), el('div', { class: 'ask' }, [adIn, kaydet])]),
+      el('div', { class: 'field', style: 'margin-top:10px' }, [el('label', { text: 'E-posta' }), el('div', { class: 'salt', text: u.email || '—' })]),
+      dogrula,
+      el('button', { class: 'btn ghost', type: 'button', text: 'Çıkış yap', style: 'margin-top:14px', onclick: () => cikisYap() })
+    ]);
+  }
+
+  function geriBildirimCard() {
+    if (!STANDALONE || !FB.hazir) return null;
+    const tur = el('select', { id: 'gb-tur' }, ['Öneri', 'Hata', 'Soru', 'Diğer'].map(t => el('option', { value: t, text: t })));
+    const ta = el('textarea', { id: 'gb-metin', rows: '4', maxlength: '2000', placeholder: 'Ne işine yaradı, ne eksik, ne bozuk? Yaz, okuyorum.' });
+    const st = el('div', { class: 'status', role: 'status' });
+    const gonder = el('button', { class: 'btn', type: 'button', text: 'Gönder' });
+    gonder.addEventListener('click', async () => {
+      const metin = ta.value.trim();
+      if (!metin) { st.className = 'status warn'; st.textContent = 'Önce mesajını yaz.'; ta.focus(); return; }
+      gonder.disabled = true; st.className = 'status'; st.textContent = 'Gönderiliyor…';
+      try {
+        const fs = FB.m.fs;
+        await fs.addDoc(fs.collection(FB.store, 'geribildirim'), { metin, tur: tur.value, zaman: new Date().toISOString(), uid: FB.user ? FB.user.uid : '', eposta: FB.user && FB.user.email ? FB.user.email : '' });
+        ta.value = ''; ta.blur(); st.className = 'status ok'; st.textContent = 'Teşekkürler, mesajın iletildi.';
+      } catch (e) { st.className = 'status warn'; st.textContent = 'Gönderilemedi; internetini kontrol edip tekrar dene.'; }
+      gonder.disabled = false;
+    });
+    return card('Geri bildirim gönder', [
+      el('div', { class: 'fgrid' }, [
+        el('div', { class: 'field full' }, [el('label', { for: 'gb-tur', text: 'Konu' }), tur]),
+        el('div', { class: 'field full' }, [el('label', { for: 'gb-metin', text: 'Mesajın' }), ta])
+      ]),
+      el('div', { style: 'height:12px' }), gonder, st,
+      el('p', { class: 'small muted', style: 'margin:6px 0 0', text: FB.user ? 'Mesajın ve e-posta adresin, sana dönüş yapılabilmesi için geliştiriciye iletilir.' : 'Giriş yapmadığın için mesajın isimsiz gider; dönüş istiyorsan mesaja iletişim bilgini ekle.' })
+    ]);
+  }
+
+  // Owner sees incoming feedback inside the app (rules allow reading only for the 'sahip' role).
+  let gelenler = null;
+  function gelenlerCard() {
+    if (!STANDALONE || S.rol !== 'sahip' || !FB.m) return null;
+    const kutu = el('div', { class: 'list' });
+    const doldur = () => {
+      kutu.textContent = '';
+      if (gelenler === null) { kutu.append(el('div', { class: 'small muted', text: 'Yükleniyor…' })); return; }
+      if (!gelenler.length) { kutu.append(el('div', { class: 'empty' }, [el('b', { text: 'Henüz mesaj yok' }), 'Kullanıcıların gönderdiği geri bildirimler burada görünür.'])); return; }
+      for (const g of gelenler) kutu.append(el('div', { class: 'item', style: 'grid-template-columns:1fr' }, [
+        el('span', { class: 'sub', text: (g.tur || 'Mesaj') + ' · ' + (g.zaman ? trTime(g.zaman) : '') + (g.eposta ? ' · ' + g.eposta : ' · isimsiz') }),
+        el('span', { style: 'white-space:pre-wrap;overflow-wrap:anywhere', text: g.metin || '' })
+      ]));
+    };
+    if (gelenler === null) {
+      const fs = FB.m.fs;
+      fs.getDocs(fs.query(fs.collection(FB.store, 'geribildirim'), fs.orderBy('zaman', 'desc'), fs.limit(30)))
+        .then(q => { gelenler = q.docs.map(d => d.data()); doldur(); })
+        .catch(() => { gelenler = []; doldur(); });
+    }
+    doldur();
+    return card('Gelen geri bildirimler · sadece sen görürsün', kutu);
+  }
+
+  function scrHesap() {
+    return [hesapCard(), dataCard(), geriBildirimCard(), gelenlerCard(), yasalCard(), S.loaded ? connectCard() : null];
+  }
+
   function scrGecmis() {
     const t = totals();
     const totalEkl = S.ekl.reduce((s, x) => s + Math.max(0, Number(x.tutar || 0)), 0);
@@ -1025,7 +1137,7 @@ button { cursor: pointer; }
       el('span', { class: 'sub', text: GR.filter(gg => x.dagilim && x.dagilim[gg.k] > 0.5).map(gg => gg.n + ' ' + tl0(x.dagilim[gg.k])).join(' · ') || '—' }),
       el('button', { class: 'p muted', type: 'button', style: 'border:0;background:none;padding:0;text-decoration:underline', text: 'Sil', 'aria-label': trMonth(x.ay || x.id) + ' kaydını sil', onclick: (ev) => confirmInline(ev.currentTarget, () => delSub('eklemeler', x.id), 'Emin misin?') })
     ]))) : el('div', { class: 'empty' }, [el('b', { text: 'Henüz ekleme yok' }), 'Varlıklarda adet artırdığında o ayın eklemesi otomatik kaydedilir.']);
-    return [card('Özet', stats), card('Değer geçmişi', chart), card('Aylık eklemeler', list), dataCard()];
+    return [card('Özet', stats), card('Değer geçmişi', chart), card('Aylık eklemeler', list)];
   }
 
   function dataCard() {
@@ -1044,12 +1156,8 @@ button { cursor: pointer; }
       }) : null,
       iconBtn('up', 'Yedekten yükle', 'ghost', () => document.getElementById('jsonPick').click(), { style: S.dl || STANDALONE ? '' : 'grid-column:1/-1' })
     ]);
-    const cikis = STANDALONE && FB.user
-      ? el('button', { class: 'btn ghost', type: 'button', text: 'Çıkış yap', style: 'margin-top:10px', onclick: () => cikisYap() })
-      : el('div', { style: 'display:grid;gap:10px;margin-top:10px' }, [
-          STANDALONE && FB.hazir ? el('button', { class: 'btn', type: 'button', text: 'Hesabınla giriş yap (verilerin taşınır)', onclick: () => girisSheet() }) : null,
-          el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } })]);
-    return el('div', { style: 'display:grid;gap:14px' }, [card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, (STANDALONE || S.mode !== 'bulut') ? cikis : null]), yasalCard(), S.loaded ? connectCard() : null]);
+    const geri = !STANDALONE && S.mode !== 'bulut' ? el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', style: 'margin-top:10px;width:100%', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } }) : null;
+    return card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, geri]);
   }
 
   /* ---------- edit sheet (autosave) ---------- */
@@ -1419,7 +1527,7 @@ Kurallar:
   /* ---------- launch consent and legal texts ----------
      Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
      The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
-  const YASAL_SURUM = '16 Ekim 2026 (2)';
+  const YASAL_SURUM = '16 Ekim 2026 (3)';
   const SORUMLU = 'Portföy Defteri geliştiricisi';
   const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
   S.onay = false; S.riza = false;
@@ -1491,13 +1599,14 @@ Kurallar:
       ]],
       ['h', 'İşlenen veriler'],
       ['ul', [
-        'Hesap bilgileri: e-posta adresin; Google ile girersen Google hesabındaki adın ve profil fotoğrafının adresi; Firebase kullanıcı kimliği; hesap oluşturma ve son giriş zamanı. E-postayla kayıt olursan şifren Firebase\'de geri çevrilemez biçimde (hash) tutulur; Geliştirici şifreni göremez.',
+        'Hesap bilgileri: e-posta adresin; adın ve soyadın (Google ile girersen Google hesabından gelir, e-postayla kayıtta sen yazarsın); Google ile girersen profil fotoğrafının adresi; Firebase kullanıcı kimliği; hesap oluşturma ve son giriş zamanı. E-postayla kayıt olursan şifren Firebase\'de geri çevrilemez biçimde (hash) tutulur; Geliştirici şifreni göremez.',
         'Finansal bilgiler: varlık kodu ve adı, adet, fiyat, ortalama maliyet, aylık ekleme tutarı, hedef oranlar, günlük değer geçmişi.',
+        'Geri bildirim: gönderdiğin mesaj ve konusu; giriş yaptıysan e-posta adresin ve kullanıcı kimliğin. Yalnızca sana dönüş yapmak ve Uygulamayı geliştirmek için kullanılır.',
         'Teknik bilgiler: sayfa, fiyat dosyası ve yazı tipleri yüklenirken ve giriş yaparken IP adresin ve tarayıcı bilgilerin GitHub ve Google sunucularına iletilir.',
         'Onay kaydı: son onay tarihin, onayladığın metin sürümü ve açık rıza durumun (yalnızca cihazında).'
       ]],
       ['h', 'Amaçlar'],
-      ['p', 'Hesabını oluşturmak ve girişini doğrulamak, portföyünü kaydetmek ve cihazların arasında eşitlemek, değerini hesaplamak, aylık ekleme planını göstermek, şifre yenileme ve e-posta doğrulama iletileri göndermek, onaylarını kaydetmek ve Uygulamanın güvenli çalışmasını sağlamak.'],
+      ['p', 'Hesabını oluşturmak ve girişini doğrulamak, portföyünü kaydetmek ve cihazların arasında eşitlemek, değerini hesaplamak, aylık ekleme planını göstermek, şifre yenileme ve e-posta doğrulama iletileri göndermek, geri bildirimlerini alıp yanıtlamak, onaylarını kaydetmek ve Uygulamanın güvenli çalışmasını sağlamak.'],
       ['h', 'Hukuki sebepler'],
       ['ul', [
         'KVKK md. 5/2-c: hesabın ve Kullanım Şartları kapsamındaki hizmetin sunulması için zorunlu olması.',
@@ -1621,18 +1730,21 @@ Kurallar:
     const t = totals();
     document.getElementById('topTotal').textContent = S.p.pozisyonlar.length ? tl0(t.T) : '—';
     document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
+    const hb = document.getElementById('hesapBtn');
+    if (hb) { const giris = STANDALONE && FB.user; hb.className = 'hesap-btn' + (giris ? ' giris' : ''); hb.textContent = ''; if (giris) hb.textContent = basHarf(); else hb.append(icon('kisi')); hb.title = giris ? 'Giriş yapıldı: ' + (FB.user.email || '') : 'Giriş yapılmadı'; hb.setAttribute('aria-label', hb.title); }
     const a = document.activeElement && document.activeElement.id;
-    if (a && (['tutar', 'kur', 'aylik', 'aiSoru'].includes(a) || /^h-/.test(a))) return;
+    if (a && (['tutar', 'kur', 'aylik', 'aiSoru', 'gb-metin'].includes(a) || /^h-/.test(a))) return;
     main.textContent = '';
     if (!S.onay) { document.querySelector('.nav').hidden = true; document.getElementById('top').hidden = true; document.getElementById('banner').hidden = true; main.append(el('div', { class: 'screen' }, onayScreen())); return; }
     const gate = needsGate();
     document.querySelector('.nav').hidden = gate; document.getElementById('top').hidden = gate;
     if (gate) { main.append(el('div', { class: 'screen' }, gateScreen())); return; }
     if (S.tab === 'yorum') S.tab = 'ozet';
-    const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis, haber: scrHaber }[S.tab] || scrOzet;
+    const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis, haber: scrHaber, hesap: scrHesap }[S.tab] || scrOzet;
     main.append(el('div', { class: 'screen' }, scr().filter(Boolean)));
   }
 
+  document.getElementById('hesapBtn').addEventListener('click', () => { S.tab = 'hesap'; try { localStorage.setItem('pd-tab', 'hesap'); } catch (e) {} render(); window.scrollTo({ top: 0 }); });
   document.getElementById('nav').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return;
     S.tab = b.dataset.tab; S.calc = null; try { localStorage.setItem('pd-tab', S.tab); } catch (er) {}

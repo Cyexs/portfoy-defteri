@@ -13,6 +13,18 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+    // Feedback: anyone may send a short message; only the owner can read it, nobody can change it.
+    match /geribildirim/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['metin', 'tur', 'zaman', 'uid', 'eposta'])
+        && request.resource.data.metin is string
+        && request.resource.data.metin.size() > 0 && request.resource.data.metin.size() <= 2000
+        && request.resource.data.tur is string && request.resource.data.tur.size() <= 20
+        && (request.resource.data.uid == '' || (request.auth != null && request.resource.data.uid == request.auth.uid))
+        && (request.resource.data.eposta == '' || (request.auth != null && request.resource.data.eposta == request.auth.token.email));
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/roller/$(request.auth.uid)).data.rol == 'sahip';
+      allow update, delete: if false;
+    }
     // Owner-only screener lists, written by the GitHub price job with a service account.
     match /sahip/{doc=**} {
       allow read: if request.auth != null
