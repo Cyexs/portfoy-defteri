@@ -73,35 +73,3 @@ Telefon değiştirmeden önce de aynı şekilde yedek al.
 ## Bu sürümde olmayanlar
 
 Ekran görüntüsünden varlık okuma Claude'a bağlı olduğu için yalnızca claude.ai sürümünde çalışır. Burada varlıklar elle eklenir.
-
-## Claude yorumu (API) — şimdilik kapalı
-
-Claude yorumu şimdilik yalnızca claude.ai sürümünde (sahibine özel). Aşağıdaki API hazır ama kurulmadı; sırlar eklenmediği sürece hiçbir şey yayınlanmaz ve uygulamada Yorum sekmesi görünmez.
-
-Uygulamadaki Claude yorumu ve ekran görüntüsü okuma, `api/` klasöründeki küçük bir Cloudflare Worker üzerinden çalışır.
-Anthropic API anahtarı bu sunucuda gizli durur; uygulamanın içinde görünmez.
-
-- **Model:** yorum için Claude Sonnet 5.5, ekran görüntüsü okuma için Claude Haiku 5.5.
-- **Sınırlar (İstanbul saatine göre günlük):** kişi başı 3 yorum ve 5 görüntü okuma; tüm uygulama için toplam 60 istek.
-  Değiştirmek için `api/wrangler.toml` içindeki `GUNLUK_YORUM`, `GUNLUK_OKU`, `GUNLUK_TOPLAM`.
-- **Maliyet:** bir yorum en fazla ~2 sent, bir görüntü okuma 1 sentin altında. Toplam sınır her gün dolsa bile ayda en fazla ~30 $ eder; gerçek kullanımda çok daha az.
-  Asıl güvence, Anthropic Console'da koyacağın aylık harcama sınırıdır.
-- **Gizlilik:** sunucu portföy verisini, görüntüleri ve soruları saklamaz; kayıt (log) kapalıdır. Günlük sayaç için sadece
-  rastgele cihaz kimliği ve IP'nin tek yönlü özeti tutulur, iki gün içinde silinir.
-
-### Kurulum (bir kez, ~15 dakika)
-
-1. **Anthropic API anahtarı:** https://console.anthropic.com → hesap aç → **Billing** → kredi yükle (en az 5 $) →
-   **Limits** → aylık harcama sınırı koy (ör. 10 $) → **API Keys** → **Create Key** → anahtarı kopyala.
-2. **Cloudflare hesabı:** https://dash.cloudflare.com → ücretsiz hesap aç → soldan **Workers & Pages** → bir kez aç
-   (workers.dev alt alan adını seçmeni isterse seç).
-   - **Account ID:** Workers & Pages sayfasının sağında **Account ID** → kopyala.
-   - **API token:** sağ üstte profil → **My Profile** → **API Tokens** → **Create Token** → **Edit Cloudflare Workers** şablonu →
-     **Use template** → **Continue to summary** → **Create Token** → kopyala.
-3. **GitHub sırları:** bu depoda **Settings → Secrets and variables → Actions → New repository secret**, üç tane ekle:
-   `ANTHROPIC_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`.
-4. **Yayınla:** **Actions** → **API'yi yayınla** → **Run workflow**. 1–2 dakika sonra depoda `api.json` oluşur;
-   uygulamayı yenileyince Yorum sekmesi ve "Görüntüden" düğmesi çalışır.
-
-`api/` klasöründe bir değişiklik yapıldığında API kendiliğinden yeniden yayınlanır.
-Anahtarı değiştirmek için GitHub'daki `ANTHROPIC_API_KEY` sırrını güncelleyip **API'yi yayınla**'yı yeniden çalıştır.
