@@ -287,6 +287,19 @@ button { cursor: pointer; }
 .onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .warn { color: var(--bad); font-size: 12.5px; }
 .status.warn { color: var(--bad); }
+.durum.pro { background: color-mix(in srgb, var(--c-altin) 22%, var(--surface)); color: var(--ink); }
+.kilit { display: grid; gap: 6px; }
+.yanit { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; font-size: 14px; }
+.nitem .oz { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.haber-sayfa { display: grid; gap: 12px; }
+.haber-sayfa h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(24px, 6.5vw, 30px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.haber-sayfa .lead { font-weight: 700; font-size: 16px; margin: 0; line-height: 1.5; }
+.haber-sayfa p { margin: 0; line-height: 1.65; }
+.haber-sayfa h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); margin: 6px 0 8px; }
+.haber-sayfa .when { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.kaynak { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.kaynak a, .nitem a.t { color: var(--ink); }
+.pf-satir { grid-template-columns: 1fr auto; align-items: center; }
 .top-r { display: flex; align-items: center; gap: 12px; }
 .hesap-btn { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink-2); display: grid; place-items: center; padding: 0; font-family: var(--f-display); font-size: 16px; flex: none; }
 .hesap-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
@@ -598,7 +611,7 @@ button { cursor: pointer; }
   let lsOk = true;
   function lsSave() { try { localStorage.setItem(LS, JSON.stringify({ p: S.p, ekl: S.ekl, gec: S.gec })); lsOk = true; } catch (e) { lsOk = false; } }
   function lsLoad() { try { const r = localStorage.getItem(LS); return r ? JSON.parse(r) : null; } catch (e) { lsOk = false; return null; } }
-  const portRef = () => S.db.doc('data/users/' + S.uid + '/portfoy');
+  const portRef = () => S.db.doc('data/users/' + S.uid + '/' + (S.aktif && S.aktif !== 'ana' ? 'portfoy-' + S.aktif : 'portfoy'));
   const upsertLocal = (arr, id, data) => { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { id, ...data }; else arr.push({ id, ...data }); };
 
   async function savePort() {
@@ -641,7 +654,8 @@ button { cursor: pointer; }
   async function snapshotToday() {
     if (!S.p.pozisyonlar.length) return;
     const t = totals(), id = ymd(new Date());
-    await saveSub('gecmis', id, { tarih: id, deger_tl: Math.round(t.T * 100) / 100, maliyet_tl: Math.round(t.C * 100) / 100 });
+    const gram = altinFiyat('gram');
+    await saveSub('gecmis', id, { tarih: id, deger_tl: Math.round(t.T * 100) / 100, maliyet_tl: Math.round(t.C * 100) / 100, kur: Number(S.p.kur) || 0, gram: gram ? Math.round(gram * 100) / 100 : 0 });
   }
 
   /* ---------- official rate ---------- */
@@ -738,13 +752,14 @@ button { cursor: pointer; }
     S.ortakAltin = await readOrtak('altin');
 
     let cloud = false;
+    if (STANDALONE && FB.user && db) { S.uid = uid; await rolYukle(); await portfoylerYukle(); }
     if (db && uid) {
       S.uid = uid;
       try {
         const snap = await portRef().get();
         if (snap.exists) cloud = true;
         else {
-          const local = lsLoad();
+          const local = S.aktif === 'ana' ? lsLoad() : null;
           const start = local && local.p ? local.p : EMPTY();
           try { await portRef().set(clone(start)); cloud = true; if (local) { S.ekl = local.ekl || []; S.gec = local.gec || []; for (const e of S.ekl) await portRef().collection('eklemeler').doc(e.id).set(strip(e)); for (const g of S.gec) await portRef().collection('gecmis').doc(g.id).set(strip(g)); } }
           catch (e) { cloud = false; }
@@ -759,6 +774,7 @@ button { cursor: pointer; }
         S.loaded = true; render();
       }, () => { showBanner('Veriler şu an yüklenemedi. Sayfayı yenilemeyi dene.'); });
       portRef().collection('eklemeler').limit(240).onSnapshot((q) => { S.ekl = q.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => /^\d{4}-\d{2}$/.test(x.id)).sort((a, b) => a.id < b.id ? 1 : -1); render(); }, () => {});
+      portRef().collection('islemler').orderBy('tarih', 'desc').limit(500).onSnapshot((q) => { S.isl = q.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, () => {});
       portRef().collection('gecmis').orderBy('tarih', 'asc').limit(1000).onSnapshot((q) => { S.gec = q.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, () => {});
       const first = await portRef().get().catch(() => null);
       if (first && first.exists) S.p = { ...EMPTY(), ...clone(first.data()) };
@@ -768,7 +784,7 @@ button { cursor: pointer; }
       if (local) { S.p = { ...EMPTY(), ...local.p }; S.ekl = local.ekl || []; S.gec = local.gec || []; }
       if (!lsOk) showBanner('Bu tarayıcı veri saklamaya izin vermiyor; değişiklikler sayfa kapanınca kaybolur. Yedek indirmeyi unutma.');
     }
-    await rolYukle();
+    if (!STANDALONE) await rolYukle();
     S.loaded = true;
     if (S.ortakKur && S.p.kurKaynak !== 'elle' && S.ortakKur.tarih !== S.p.kurTarih) await applyKur(S.ortakKur, true);
     else if (S.ortakKur && !S.p.pozisyonlar.length && S.p.kurKaynak === 'elle' && !S.p.kurTarih) await applyKur(S.ortakKur, true);
@@ -891,7 +907,7 @@ button { cursor: pointer; }
       hist = card('Değer geçmişi', [lineChart([{ v: pts.map(g => g.deger_tl), c: 'var(--accent)' }, { v: pts.map(g => g.maliyet_tl), c: 'var(--ink-2)', dash: '4 4' }], pts.map(g => trShort(g.tarih)), { fmt: v => Math.round(v / 1000) + 'B', h: 140, label: 'Değer geçmişi' }),
         el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Düz çizgi değer, kesikli çizgi yatırdığın tutar.' })]);
     }
-    return [hesapDavet(), hero, alloc, hist, movers];
+    return [hesapDavet(), hero, alloc, reelCard(), hist, movers];
   }
 
   function kurCard() {
@@ -976,7 +992,8 @@ button { cursor: pointer; }
     });
     return [varlikPasta(t), ...kartlar,
       el('div', { class: 'btns' }, [gorselVar() ? iconBtn('image', 'Görüntüden', 'ghost', () => pickImages()) : null, el('button', { class: 'btn ghost', type: 'button', style: gorselVar() ? '' : 'grid-column:1/-1', text: '+ Altın ekle', onclick: () => editSheet(null, { grup: 'altin', altinTur: 'gram' }) }),
-        el('button', { class: 'btn', type: 'button', text: '+ Varlık ekle', onclick: () => editSheet(null), style: 'grid-column:1/-1' })]),
+        el('button', { class: 'btn', type: 'button', text: '+ Varlık ekle', onclick: () => editSheet(null), style: 'grid-column:1/-1' }),
+        pro() && S.mode === 'bulut' ? el('button', { class: 'btn ghost', type: 'button', text: '+ İşlem ekle (alış / satış / temettü)', onclick: () => islemSheet(), style: 'grid-column:1/-1' }) : null]),
       el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Bir varlığa dokun; değiştirdiğin her şey otomatik kaydedilir.' }),
       kurCard(), altinCard()];
   }
@@ -1100,32 +1117,379 @@ button { cursor: pointer; }
     ]);
   }
 
-  // Owner sees incoming feedback inside the app (rules allow reading only for the 'sahip' role).
+  // Owner sees incoming feedback inside the app and answers it there (rules: read and reply only for 'sahip').
   let gelenler = null;
   function gelenlerCard() {
     if (!STANDALONE || S.rol !== 'sahip' || !FB.m) return null;
     const kutu = el('div', { class: 'list' });
+    const fs = FB.m.fs;
     const doldur = () => {
       kutu.textContent = '';
       if (gelenler === null) { kutu.append(el('div', { class: 'small muted', text: 'Yükleniyor…' })); return; }
       if (!gelenler.length) { kutu.append(el('div', { class: 'empty' }, [el('b', { text: 'Henüz mesaj yok' }), 'Kullanıcıların gönderdiği geri bildirimler burada görünür.'])); return; }
-      for (const g of gelenler) kutu.append(el('div', { class: 'item', style: 'grid-template-columns:1fr' }, [
-        el('span', { class: 'sub', text: (g.tur || 'Mesaj') + ' · ' + (g.zaman ? trTime(g.zaman) : '') + (g.eposta ? ' · ' + g.eposta : ' · isimsiz') }),
-        el('span', { style: 'white-space:pre-wrap;overflow-wrap:anywhere', text: g.metin || '' })
-      ]));
+      for (const g of gelenler) {
+        const ta = el('textarea', { id: 'yanit-' + g.id, rows: '3', maxlength: '2000', placeholder: g.uid ? 'Yanıtını yaz; kişi uygulamada Hesap → Mesajlarım altında görür.' : 'İsimsiz mesaj; uygulama içinden yanıt gidemez.', disabled: g.uid ? false : 'disabled' });
+        ta.value = g.yanit || '';
+        const st = el('span', { class: 'small muted' });
+        const gonder = el('button', { class: 'btn sm', type: 'button', text: g.yanit ? 'Yanıtı güncelle' : 'Yanıtla', disabled: g.uid ? false : 'disabled', onclick: async (e) => {
+          const v = ta.value.trim(); if (!v) { ta.focus(); return; }
+          e.currentTarget.disabled = true;
+          try { const z = new Date().toISOString(); await fs.updateDoc(fs.doc(FB.store, 'geribildirim', g.id), { yanit: v, yanitZaman: z }); g.yanit = v; g.yanitZaman = z; ta.blur(); st.textContent = 'Yanıt gönderildi'; toast('Yanıt gönderildi'); }
+          catch (er) { st.textContent = 'Gönderilemedi; kuralları güncelledin mi?'; }
+          e.currentTarget.disabled = false;
+        } });
+        kutu.append(el('div', { class: 'item', style: 'grid-template-columns:1fr;gap:6px' }, [
+          el('span', { class: 'sub', text: (g.tur || 'Mesaj') + ' · ' + (g.zaman ? trTime(g.zaman) : '') + (g.eposta ? ' · ' + g.eposta : ' · isimsiz') + (g.yanitZaman ? ' · yanıtlandı' : '') }),
+          el('span', { style: 'white-space:pre-wrap;overflow-wrap:anywhere', text: g.metin || '' }),
+          el('div', { class: 'field' }, [ta]),
+          el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, [gonder, g.eposta ? el('a', { class: 'small', href: 'mailto:' + g.eposta + '?subject=' + encodeURIComponent('Portföy Defteri geri bildirimin'), text: 'E-postayla yanıtla' }) : null, st])
+        ]));
+      }
     };
     if (gelenler === null) {
-      const fs = FB.m.fs;
       fs.getDocs(fs.query(fs.collection(FB.store, 'geribildirim'), fs.orderBy('zaman', 'desc'), fs.limit(30)))
-        .then(q => { gelenler = q.docs.map(d => d.data()); doldur(); })
+        .then(q => { gelenler = q.docs.map(d => ({ id: d.id, ...d.data() })); doldur(); })
         .catch(() => { gelenler = []; doldur(); });
     }
     doldur();
     return card('Gelen geri bildirimler · sadece sen görürsün', kutu);
   }
 
+  /* ---------- Pro: several notebooks, trade log, real return, Excel and yearly card ----------
+     Pro is a role ('pro' or 'sahip') in roller/{uid}; it will be sold only through Google Play. */
+  const pro = () => STANDALONE && !!FB.user && (S.rol === 'pro' || S.rol === 'sahip');
+  const proKilit = (ad, aciklama) => card(null, el('div', { class: 'kilit' }, [el('span', { class: 'durum pro', text: 'Pro' }), el('b', { text: ad }), el('p', { class: 'small muted', style: 'margin:0', text: aciklama })]));
+
+  // Several notebooks: data/users/{uid}/portfoyler keeps the list; each notebook is its own document.
+  S.portfoyler = [{ id: 'ana', ad: 'Ana portföy' }]; S.aktif = 'ana';
+  const aktifAd = () => (S.portfoyler.find(x => x.id === S.aktif) || S.portfoyler[0] || { ad: 'Ana portföy' }).ad;
+  const listeRef = () => S.db.doc('data/users/' + S.uid + '/portfoyler');
+  async function portfoylerYukle() {
+    if (!STANDALONE || !FB.user || !S.db) return;
+    try {
+      const r = await listeRef().get(); const d = r.exists ? (r.data() || {}) : {};
+      if (Array.isArray(d.liste) && d.liste.length) S.portfoyler = d.liste;
+    } catch (e) {}
+    let a = 'ana'; try { a = localStorage.getItem('pd-aktif-' + FB.user.uid) || 'ana'; } catch (e) {}
+    S.aktif = pro() && S.portfoyler.some(x => x.id === a) ? a : 'ana';
+  }
+  const listeKaydet = () => listeRef().set({ liste: S.portfoyler });
+  function portfoyeGec(id) { try { localStorage.setItem('pd-aktif-' + FB.user.uid, id); } catch (e) {} toast('Portföy açılıyor…'); setTimeout(() => location.reload(), 300); }
+  function portfoyAdSheet(mevcut) {
+    const inp = el('input', { id: 'pf-ad', type: 'text', value: mevcut ? mevcut.ad : '', placeholder: 'ör. Çocuk birikimi', maxlength: '40' });
+    const st = el('div', { class: 'status' });
+    const sh = openSheet(mevcut ? 'Portföyün adını değiştir' : 'Yeni portföy', [
+      el('div', { class: 'field' }, [el('label', { for: 'pf-ad', text: 'Ad' }), inp]), st,
+      el('button', { class: 'btn', type: 'button', text: mevcut ? 'Kaydet' : 'Oluştur ve aç', onclick: async (e) => {
+        const ad = inp.value.trim(); if (!ad) { st.className = 'status warn'; st.textContent = 'Bir ad yaz.'; return; }
+        e.currentTarget.disabled = true;
+        try {
+          if (mevcut) { mevcut.ad = ad; await listeKaydet(); sh.close(); render(); toast('Kaydedildi'); return; }
+          const id = Date.now().toString(36);
+          S.portfoyler = [...S.portfoyler, { id, ad }];
+          await S.db.doc('data/users/' + S.uid + '/portfoy-' + id).set({ ...EMPTY(), kur: S.p.kur, kurKaynak: S.p.kurKaynak, kurTarih: S.p.kurTarih });
+          await listeKaydet(); sh.close(); portfoyeGec(id);
+        } catch (er) { st.className = 'status warn'; st.textContent = 'Kaydedilemedi; internetini kontrol et.'; e.currentTarget.disabled = false; }
+      } }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ]);
+    setTimeout(() => inp.focus(), 60);
+  }
+  async function portfoySil(p) {
+    const fs = FB.m.fs, yol = 'data/users/' + S.uid + '/portfoy-' + p.id;
+    try {
+      for (const alt of ['eklemeler', 'gecmis', 'islemler']) { const q = await fs.getDocs(fs.collection(FB.store, yol + '/' + alt)); for (const d of q.docs) await fs.deleteDoc(fs.doc(FB.store, yol + '/' + alt + '/' + d.id)); }
+      await fs.deleteDoc(fs.doc(FB.store, yol));
+      S.portfoyler = S.portfoyler.filter(x => x.id !== p.id); await listeKaydet(); render(); toast(p.ad + ' silindi');
+    } catch (e) { toast('Silinemedi; tekrar dene.'); }
+  }
+  function portfoylerCard() {
+    if (!pro() || S.mode !== 'bulut') return null;
+    const satirlar = S.portfoyler.map(p => el('div', { class: 'item pf-satir' }, [
+      el('div', { style: 'min-width:0' }, [el('div', { class: 'k', text: p.ad }), el('div', { class: 'sub', text: p.id === S.aktif ? 'Şu an açık' : (p.id === 'ana' ? 'Ana defter' : '') })]),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end' }, [
+        p.id === S.aktif ? el('span', { class: 'durum acik', text: 'Açık' }) : el('button', { class: 'btn sm', type: 'button', text: 'Aç', onclick: () => portfoyeGec(p.id) }),
+        el('button', { class: 'btn sm ghost', type: 'button', text: 'Ad', onclick: () => portfoyAdSheet(p) }),
+        p.id === 'ana' || p.id === S.aktif ? null : el('button', { class: 'btn sm danger', type: 'button', text: 'Sil', onclick: (e) => confirmInline(e.currentTarget, () => portfoySil(p), 'Emin misin?') })
+      ])
+    ]));
+    return card('Portföylerim · Pro', [el('div', { class: 'list' }, satirlar),
+      el('button', { class: 'btn ghost', type: 'button', text: '+ Yeni portföy', style: 'margin-top:10px', onclick: () => portfoyAdSheet(null) })]);
+  }
+
+  // Trade log: every buy, sell and dividend, with realised profit for sells.
+  S.isl = [];
+  const TUR_AD = { al: 'Alış', sat: 'Satış', temettu: 'Temettü' };
+  async function islemKaydet(d) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    S.isl = [...S.isl, { id, ...d }].sort((a, b) => a.tarih < b.tarih ? 1 : -1);
+    try { await portRef().collection('islemler').doc(id).set(d); } catch (e) { toast('İşlem kaydedilemedi; tekrar dene.'); }
+  }
+  async function islemSil(id) { S.isl = S.isl.filter(x => x.id !== id); render(); try { await portRef().collection('islemler').doc(id).delete(); } catch (e) {} }
+  function islemSheet(onKod) {
+    const poz = S.p.pozisyonlar.filter(p => !p.altinTur || true);
+    const tur = el('select', { id: 'i-tur' }, [el('option', { value: 'al', text: 'Alış' }), el('option', { value: 'sat', text: 'Satış' }), el('option', { value: 'temettu', text: 'Temettü' })]);
+    const vs = el('select', { id: 'i-kod' }, [...poz.map(p => el('option', { value: p.kod, text: (p.altinTur && AN[p.altinTur] ? AN[p.altinTur].n : p.kod) + (p.ad && !p.altinTur ? ' · ' + p.ad : ''), selected: p.kod === onKod ? 'selected' : false })), el('option', { value: '__yeni', text: '+ Yeni varlık' })]);
+    const yKod = el('input', { id: 'i-ykod', type: 'text', autocapitalize: 'characters', placeholder: 'ör. EREGL' });
+    const yAd = el('input', { id: 'i-yad', type: 'text', placeholder: 'İsteğe bağlı' });
+    const yGrup = el('select', { id: 'i-ygrup' }, GR.map(g => el('option', { value: g.k, text: g.n })));
+    const yBirim = el('select', { id: 'i-ybirim' }, ['TL', 'USD'].map(b => el('option', { value: b, text: b })));
+    const yeniAlan = el('div', { class: 'fgrid full', style: 'grid-column:1/-1' }, [
+      el('div', { class: 'field' }, [el('label', { for: 'i-ykod', text: 'Kod' }), yKod]), el('div', { class: 'field' }, [el('label', { for: 'i-yad', text: 'Ad' }), yAd]),
+      el('div', { class: 'field' }, [el('label', { for: 'i-ygrup', text: 'Grup' }), yGrup]), el('div', { class: 'field' }, [el('label', { for: 'i-ybirim', text: 'Para birimi' }), yBirim])]);
+    const tarih = el('input', { id: 'i-tarih', type: 'date', value: ymd(new Date()), max: ymd(new Date()) });
+    const adet = el('input', { id: 'i-adet', type: 'text', inputmode: 'decimal' });
+    const fiyat = el('input', { id: 'i-fiyat', type: 'text', inputmode: 'decimal' });
+    const say = el('input', { type: 'checkbox', id: 'i-say', checked: true });
+    const sayL = el('label', { class: 'chk full', for: 'i-say', style: 'grid-column:1/-1' }, [say, el('span', { text: 'Bu ayın eklemesine say' })]);
+    const st = el('div', { class: 'status' });
+    const lAdet = el('label', { for: 'i-adet', text: 'Adet' }), lFiyat = el('label', { for: 'i-fiyat', text: 'Birim fiyat' });
+    const sync = () => {
+      const t = tur.value; yeniAlan.hidden = !(vs.value === '__yeni' && t === 'al');
+      if (vs.value === '__yeni' && t !== 'al') vs.value = poz[0] ? poz[0].kod : '__yeni';
+      lAdet.closest('.field').hidden = t === 'temettu'; lFiyat.textContent = t === 'temettu' ? 'Net temettü tutarı (₺)' : 'Birim fiyat';
+      sayL.hidden = t !== 'al';
+      const p = poz.find(x => x.kod === vs.value);
+      if (p && t !== 'temettu' && !fiyat.value) fiyat.value = n2(p.fiyat, p.fiyat < 10 ? 4 : 2);
+    };
+    tur.addEventListener('change', sync); vs.addEventListener('change', () => { fiyat.value = ''; sync(); });
+    const kaydet = el('button', { class: 'btn', type: 'button', text: 'Kaydet', onclick: async () => {
+      const t = tur.value, q = parseNum(adet.value), f = parseNum(fiyat.value), tr = tarih.value || ymd(new Date());
+      const hata = (m) => { st.className = 'status warn'; st.textContent = m; };
+      let arr = S.p.pozisyonlar.slice(), p, i;
+      if (vs.value === '__yeni') {
+        const kod = yKod.value.trim().toUpperCase(); if (!kod) return hata('Kodu yaz.');
+        if (arr.some(x => x.kod === kod)) return hata(kod + ' zaten listende; listeden seç.');
+        p = { kod, ad: yAd.value.trim(), grup: yGrup.value, birim: yBirim.value, adet: 0, fiyat: f, maliyet: f }; i = -1;
+      } else { i = arr.findIndex(x => x.kod === vs.value); p = arr[i]; }
+      if (!p) return hata('Varlık seç.');
+      const kur = p.birim === 'USD' ? S.p.kur : 1;
+      if (t === 'temettu') {
+        if (!(f > 0)) return hata('Temettü tutarını yaz.');
+        await islemKaydet({ tarih: tr, tur: t, kod: p.kod, ad: p.ad || '', tutar_tl: Math.round(f * 100) / 100 });
+        sh.close(); render(); toast('Temettü kaydedildi'); return;
+      }
+      if (!(q > 0)) return hata('Adedi yaz.'); if (!(f > 0)) return hata('Fiyatı yaz.');
+      if (t === 'al') {
+        const yeniAdet = Number(p.adet) + q, yeniMal = (Number(p.adet) * Number(p.maliyet) + q * f) / yeniAdet;
+        const np = { ...p, adet: Math.round(yeniAdet * 1e6) / 1e6, maliyet: Math.round(yeniMal * 1e6) / 1e6 };
+        if (i >= 0) arr[i] = np; else arr.push(np);
+        await commitPositions(arr, say.checked);
+        await islemKaydet({ tarih: tr, tur: t, kod: p.kod, ad: p.ad || '', birim: p.birim, adet: q, fiyat: f, kur, tutar_tl: Math.round(q * f * kur * 100) / 100 });
+        sh.close(); toast('Alış kaydedildi');
+      } else {
+        if (q > Number(p.adet) + 1e-9) return hata('Elindeki adetten fazla satamazsın (' + nAuto(p.adet) + ').');
+        const kz = (f - Number(p.maliyet)) * q * kur;
+        const kalan = Math.round((Number(p.adet) - q) * 1e6) / 1e6;
+        if (kalan <= 0) arr.splice(i, 1); else arr[i] = { ...p, adet: kalan };
+        await commitPositions(arr, false);
+        await islemKaydet({ tarih: tr, tur: t, kod: p.kod, ad: p.ad || '', birim: p.birim, adet: q, fiyat: f, kur, maliyet: Number(p.maliyet), tutar_tl: Math.round(q * f * kur * 100) / 100, kz_tl: Math.round(kz * 100) / 100 });
+        sh.close(); toast('Satış kaydedildi · ' + (kz >= 0 ? 'kâr ' : 'zarar ') + tl0(Math.abs(kz)));
+      }
+      render();
+    } });
+    editing = true;
+    const sh = openSheet('İşlem ekle', [
+      el('div', { class: 'fgrid' }, [
+        el('div', { class: 'field' }, [el('label', { for: 'i-tur', text: 'Tür' }), tur]),
+        el('div', { class: 'field' }, [el('label', { for: 'i-tarih', text: 'Tarih' }), tarih]),
+        el('div', { class: 'field full' }, [el('label', { for: 'i-kod', text: 'Varlık' }), vs]),
+        yeniAlan,
+        el('div', { class: 'field' }, [lAdet, adet]),
+        el('div', { class: 'field' }, [lFiyat, fiyat]),
+        sayL
+      ]), st, kaydet,
+      el('p', { class: 'small muted', style: 'margin:0', text: 'Alışta ortalama maliyet, satışta gerçekleşen kâr/zarar kendiliğinden hesaplanır ve varlığın adedi güncellenir.' }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ], () => { editing = false; render(); });
+    if (!poz.length) vs.value = '__yeni';
+    sync();
+  }
+  function islemlerCard() {
+    if (!pro() || S.mode !== 'bulut') return null;
+    const list = S.isl.slice(0, 40).map(x => el('div', { class: 'item' }, [
+      el('span', { class: 'k', text: (TUR_AD[x.tur] || x.tur) + ' · ' + x.kod }),
+      el('span', { class: 'v', text: x.tur === 'sat' ? sgnTl(x.kz_tl || 0) : tl0(x.tutar_tl) }),
+      el('span', { class: 'sub', text: trShort(x.tarih) + (x.tur === 'temettu' ? ' · net' : ' · ' + nAuto(x.adet) + ' × ' + (x.birim === 'USD' ? '$' : '₺') + n2(x.fiyat)) }),
+      el('button', { class: 'p muted', type: 'button', style: 'border:0;background:none;padding:0;text-decoration:underline', text: 'Sil', onclick: (ev) => confirmInline(ev.currentTarget, () => islemSil(x.id), 'Emin misin?') })
+    ]));
+    return card('İşlem defteri · Pro', [
+      el('button', { class: 'btn', type: 'button', text: '+ İşlem ekle', onclick: () => islemSheet() }),
+      el('div', { style: 'height:6px' }),
+      list.length ? el('div', { class: 'list' }, list) : el('div', { class: 'empty' }, [el('b', { text: 'Henüz işlem yok' }), 'Alış, satış ve temettülerini buraya gir; kâr/zarar ve yıllık özet kendiliğinden çıkar.']),
+      el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Bir kaydı silmek varlığın adedini geri almaz; gerekirse varlığı Varlıklar sekmesinden düzelt.' })
+    ]);
+  }
+  let ozetYil = new Date().getFullYear();
+  function yillikOzetCard() {
+    if (!pro() || S.mode !== 'bulut' || !S.isl.length) return null;
+    const yillar = [...new Set(S.isl.map(x => Number(String(x.tarih).slice(0, 4))))].sort((a, b) => b - a);
+    if (!yillar.includes(ozetYil)) ozetYil = yillar[0];
+    const yx = S.isl.filter(x => String(x.tarih).startsWith(String(ozetYil)));
+    const kz = yx.filter(x => x.tur === 'sat').reduce((a, x) => a + (x.kz_tl || 0), 0);
+    const tem = yx.filter(x => x.tur === 'temettu').reduce((a, x) => a + (x.tutar_tl || 0), 0);
+    const alis = yx.filter(x => x.tur === 'al').reduce((a, x) => a + (x.tutar_tl || 0), 0);
+    const kodlar = {};
+    for (const x of yx) { const k = kodlar[x.kod] || (kodlar[x.kod] = { kz: 0, tem: 0, birim: x.birim }); if (x.tur === 'sat') k.kz += x.kz_tl || 0; if (x.tur === 'temettu') k.tem += x.tutar_tl || 0; }
+    const sec = el('select', { id: 'oz-yil', onchange: (e) => { ozetYil = Number(e.target.value); render(); } }, yillar.map(y => el('option', { value: y, text: y, selected: y === ozetYil ? 'selected' : false })));
+    return card('Yıllık özet · Pro', [
+      el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('span', { class: 'muted small', text: 'Yıl' }), sec]),
+      el('div', { class: 'stats' }, [
+        el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Gerçekleşen K/Z' }), el('div', { class: 'x ' + (kz >= 0 ? 'pos' : 'neg'), text: sgnTl(kz) })]),
+        el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Temettü' }), el('div', { class: 'x', text: tl0(tem) })]),
+        el('div', { class: 'stat' }, [el('div', { class: 'l', text: 'Alışlar' }), el('div', { class: 'x', text: tl0(alis) })])
+      ]),
+      el('div', { class: 'list', style: 'margin-top:10px' }, Object.entries(kodlar).filter(([, v]) => Math.abs(v.kz) > 0.5 || v.tem > 0.5).map(([k, v]) => el('div', { class: 'item' }, [
+        el('span', { class: 'k', text: k }), el('span', { class: 'v ' + (v.kz >= 0 ? 'pos' : 'neg'), text: v.kz ? sgnTl(v.kz) : '—' }),
+        el('span', { class: 'sub', text: (v.birim === 'USD' ? 'ABD · ' : '') + (v.tem ? 'temettü ' + tl0(v.tem) : 'satıştan') }), el('span', { class: 'p' })
+      ]))),
+      el('p', { class: 'small muted', style: 'margin:10px 0 0', text: 'Tutarlar işlem günündeki fiyat ve kurla, komisyonsuz hesaplanır. Vergi beyanı için bu özeti mali müşavirine götür; Yİ-ÜFE endekslemesi ve stopaj burada yok.' })
+    ]);
+  }
+
+  // Real return: the same period measured in lira, in dollars and in grams of gold. Money added in the period is set aside (Modified Dietz).
+  let reelDonem = 'hepsi';
+  function reelGetiri(birim, bas, son) {
+    const r = (g) => birim === 'tl' ? 1 : birim === 'usd' ? g.kur : g.gram;
+    const r0 = r(bas), r1 = r(son); if (!(r0 > 0) || !(r1 > 0)) return null;
+    const v0 = bas.deger_tl / r0, v1 = son.deger_tl / r1, f = (son.maliyet_tl - bas.maliyet_tl) / ((r0 + r1) / 2);
+    const payda = v0 + f / 2; if (!(payda > 0)) return null;
+    return (v1 - v0 - f) / payda * 100;
+  }
+  function reelDonemSec() {
+    const g = S.gec.filter(x => x.kur > 0 && x.gram > 0); if (g.length < 2) return null;
+    const son = g[g.length - 1];
+    let bas = g[0];
+    if (reelDonem === '30') { const s = ymd(new Date(Date.now() - 30 * 864e5)); bas = g.find(x => x.tarih >= s) || g[0]; }
+    if (reelDonem === 'yil') { const s = new Date().getFullYear() + '-01-01'; bas = g.find(x => x.tarih >= s) || g[0]; }
+    return bas === son ? null : { bas, son };
+  }
+  function reelCard() {
+    if (!pro() || !S.p.pozisyonlar.length) return null;
+    const d = reelDonemSec();
+    const btn = (k, t) => el('button', { class: 'btn sm ' + (reelDonem === k ? '' : 'ghost'), type: 'button', text: t, onclick: () => { reelDonem = k; render(); } });
+    const kutu = (ad, v) => el('div', { class: 'stat' }, [el('div', { class: 'l', text: ad }), el('div', { class: 'x ' + (v == null ? '' : v >= 0 ? 'pos' : 'neg'), text: v == null ? '—' : sgnPct(v) })]);
+    return card('Reel getiri · Pro', [
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px' }, [btn('hepsi', 'Tüm kayıt'), btn('yil', 'Bu yıl'), btn('30', 'Son 30 gün')]),
+      d ? el('div', { class: 'stats' }, [kutu('TL olarak', reelGetiri('tl', d.bas, d.son)), kutu('Dolar olarak', reelGetiri('usd', d.bas, d.son)), kutu('Gram altın olarak', reelGetiri('gram', d.bas, d.son))])
+        : el('div', { class: 'note', text: 'Hesap için en az iki günlük kayıt gerekiyor. Uygulama her gün değer, dolar kuru ve gram altını birlikte kaydeder; birkaç gün sonra burada görünür.' }),
+      el('p', { class: 'small muted', style: 'margin:10px 0 0', text: d ? trDate(d.bas.tarih) + ' – ' + trDate(d.son.tarih) + '. Dönem içinde eklediğin para getiriden ayrılır. Enflasyona göre getiri ileride eklenecek.' : 'Enflasyona göre getiri ileride eklenecek.' })
+    ]);
+  }
+
+  // Excel export (SheetJS is loaded only when asked for).
+  async function excelAktar(btn) {
+    btn.disabled = true;
+    try {
+      if (!window.XLSX) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = no; document.head.append(s); });
+      const X = window.XLSX, wb = X.utils.book_new();
+      const ad = (p) => p.altinTur && AN[p.altinTur] ? AN[p.altinTur].n : p.kod;
+      X.utils.book_append_sheet(wb, X.utils.json_to_sheet(S.p.pozisyonlar.map(p => ({ Kod: ad(p), Ad: p.ad || '', Grup: (GN[p.grup] || GN.bist).n, Birim: p.birim, Adet: Number(p.adet), Fiyat: Number(p.fiyat), 'Ort. maliyet': Number(p.maliyet), 'Değer (TL)': Math.round(val(p) * 100) / 100, 'K/Z (TL)': Math.round((val(p) - cost(p)) * 100) / 100, 'K/Z %': cost(p) ? Math.round((val(p) - cost(p)) / cost(p) * 1000) / 10 : 0 }))), 'Varlıklar');
+      X.utils.book_append_sheet(wb, X.utils.json_to_sheet(S.isl.map(x => ({ Tarih: x.tarih, Tür: TUR_AD[x.tur] || x.tur, Kod: x.kod, Adet: x.adet || '', Fiyat: x.fiyat || '', Birim: x.birim || 'TL', 'Kur': x.kur || '', 'Tutar (TL)': x.tutar_tl || 0, 'Gerçekleşen K/Z (TL)': x.kz_tl || '' }))), 'İşlemler');
+      X.utils.book_append_sheet(wb, X.utils.json_to_sheet(S.ekl.map(x => ({ Ay: x.ay || x.id, 'Eklenen (TL)': Number(x.tutar || 0), ...Object.fromEntries(GR.map(g => [g.n, Number((x.dagilim || {})[g.k] || 0)])) }))), 'Aylık eklemeler');
+      X.utils.book_append_sheet(wb, X.utils.json_to_sheet(S.gec.map(x => ({ Tarih: x.tarih, 'Değer (TL)': x.deger_tl, 'Yatırılan (TL)': x.maliyet_tl, 'Dolar kuru': x.kur || '', 'Gram altın': x.gram || '' }))), 'Değer geçmişi');
+      X.writeFile(wb, 'portfoy-defteri-' + ymd(new Date()) + '.xlsx');
+      toast('Excel dosyası indirildi');
+    } catch (e) { toast('Excel hazırlanamadı; internetini kontrol et.'); }
+    btn.disabled = false;
+  }
+
+  // Yearly card: a shareable picture with percentages only (amounts optional).
+  async function karneCiz(tutarlar) {
+    try { await document.fonts.ready; } catch (e) {}
+    const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    const yil = new Date().getFullYear(), t = totals();
+    x.fillStyle = '#15241F'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#EEF2EF'; x.font = '64px "Young Serif", Georgia, serif'; x.fillText(yil + ' Portföy Karnem', 80, 150);
+    x.fillStyle = '#9AA9A3'; x.font = '600 34px Manrope, system-ui, sans-serif'; x.fillText(aktifAd() + ' · ' + S.p.pozisyonlar.length + ' varlık', 80, 205);
+    const d = (() => { const g = S.gec.filter(z => z.kur > 0 && z.gram > 0 && String(z.tarih).startsWith(String(yil))); return g.length > 1 ? { bas: g[0], son: g[g.length - 1] } : null; })();
+    const rows = [['Toplam K/Z', sgnPct(t.kzp)], ['Bu yıl · TL', d ? sgnPct(reelGetiri('tl', d.bas, d.son)) : '—'], ['Bu yıl · dolar', d ? sgnPct(reelGetiri('usd', d.bas, d.son)) : '—'], ['Bu yıl · altın', d ? sgnPct(reelGetiri('gram', d.bas, d.son)) : '—']];
+    rows.forEach(([a, b], i) => { const yy = 330 + i * 110; x.fillStyle = '#212B27'; x.beginPath(); x.roundRect(80, yy - 70, 920, 92, 22); x.fill(); x.fillStyle = '#9AA9A3'; x.font = '600 32px Manrope, system-ui, sans-serif'; x.fillText(a, 115, yy - 10); x.fillStyle = b.startsWith('−') ? '#EF7B6A' : '#4CC79F'; x.font = '500 46px "IBM Plex Mono", monospace'; x.textAlign = 'right'; x.fillText(b, 965, yy - 8); x.textAlign = 'left'; });
+    const renk = { kuresel: '#6E9CF0', bist: '#EA7C62', kira: '#3FBF9C', altin: '#E0B547' };
+    let a0 = -Math.PI / 2; const cx = 300, cy = 1000, R = 170;
+    for (const g of GR) { const p = t.T ? t.g[g.k] / t.T : 0; if (p <= 0) continue; x.strokeStyle = renk[g.k]; x.lineWidth = 64; x.beginPath(); x.arc(cx, cy, R, a0 + 0.02, a0 + p * 2 * Math.PI - 0.02); x.stroke(); a0 += p * 2 * Math.PI; }
+    GR.forEach((g, i) => { const yy = 880 + i * 70, p = t.T ? t.g[g.k] / t.T * 100 : 0; x.fillStyle = renk[g.k]; x.fillRect(560, yy - 26, 30, 30); x.fillStyle = '#EEF2EF'; x.font = '600 34px Manrope, system-ui, sans-serif'; x.fillText(g.n + '  %' + n2(p, 0), 610, yy); });
+    if (tutarlar) { x.fillStyle = '#EEF2EF'; x.font = '500 38px "IBM Plex Mono", monospace'; x.fillText('Değer ' + tl0(t.T) + ' · Yatırılan ' + tl0(t.C), 80, 760); }
+    x.fillStyle = '#9AA9A3'; x.font = '500 26px Manrope, system-ui, sans-serif'; x.fillText('Portföy Defteri · yatırım tavsiyesi değildir', 80, H - 70);
+    return c;
+  }
+  async function karneSheet() {
+    const tut = el('input', { type: 'checkbox', id: 'k-tutar' });
+    const img = el('img', { alt: 'Yıllık portföy karnesi', style: 'width:100%;border-radius:14px;display:block' });
+    let canvas = null;
+    const ciz = async () => { canvas = await karneCiz(tut.checked); img.src = canvas.toDataURL('image/png'); };
+    tut.addEventListener('change', ciz);
+    const indir = el('button', { class: 'btn', type: 'button', text: 'Resmi indir', onclick: () => { const a = el('a', { href: img.src, download: 'portfoy-karnem-' + new Date().getFullYear() + '.png' }); document.body.append(a); a.click(); a.remove(); } });
+    const paylas = el('button', { class: 'btn ghost', type: 'button', text: 'Paylaş', onclick: () => canvas && canvas.toBlob(async (b) => {
+      const f = new File([b], 'portfoy-karnem.png', { type: 'image/png' });
+      try { if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: 'Portföy karnem' }); else toast('Bu cihaz doğrudan paylaşmıyor; resmi indirip paylaş.'); } catch (e) {}
+    }) });
+    const sh = openSheet('Yıllık karne', [img, el('label', { class: 'chk', for: 'k-tutar' }, [tut, el('span', { text: 'Tutarları da göster (varsayılan: sadece yüzdeler)' })]), el('div', { class: 'btns' }, [indir, paylas]), el('button', { class: 'btn ghost', type: 'button', text: 'Kapat', onclick: () => sh.close() })]);
+    await ciz();
+  }
+  function proAraclar() {
+    if (!pro()) return null;
+    const ex = el('button', { class: 'btn ghost', type: 'button', text: 'Excel\'e aktar' }); ex.addEventListener('click', () => excelAktar(ex));
+    return el('div', { class: 'btns', style: 'margin-top:10px' }, [ex, el('button', { class: 'btn ghost', type: 'button', text: 'Yıllık karne', onclick: () => karneSheet() })]);
+  }
+  function proCard() {
+    if (!STANDALONE || !FB.hazir) return null;
+    if (pro()) return card('Pro', [el('div', { style: 'display:flex;gap:8px;align-items:center' }, [el('span', { class: 'durum pro', text: S.rol === 'sahip' ? 'Pro · sahip' : 'Pro aktif' })]), el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Çoklu portföy (Hesap), işlem defteri ve yıllık özet (Geçmiş), reel getiri (Özet), Excel ve yıllık karne (Veri ve yedek) açık.' })]);
+    return card('Pro', [el('ul', { class: 'tips' }, ['Birden fazla portföy', 'İşlem defteri: alış, satış, temettü; gerçekleşen kâr/zarar', 'Yıllık özet (vergi beyanı hazırlığı için)', 'Reel getiri: TL, dolar ve gram altın olarak', 'Excel\'e aktarma ve paylaşılabilir yıllık karne'].map(t => el('li', { text: t }))),
+      el('div', { class: 'note', text: 'Pro yakında Google Play\'deki uygulamadan satın alınabilecek.' })]);
+  }
+
+  // Feedback replies: the owner answers inside the app, the sender reads it under "Mesajlarım".
+  let mesajlarim = null;
+  function mesajlarimCard() {
+    if (!STANDALONE || !FB.user || !FB.m || S.rol === 'sahip') return null;
+    const kutu = el('div', { class: 'list' });
+    const doldur = () => {
+      kutu.textContent = '';
+      if (mesajlarim === null) { kutu.append(el('div', { class: 'small muted', text: 'Yükleniyor…' })); return; }
+      if (!mesajlarim.length) { kutu.append(el('div', { class: 'small muted', text: 'Gönderdiğin mesajlar ve yanıtları burada görünür.' })); return; }
+      for (const g of mesajlarim) kutu.append(el('div', { class: 'item', style: 'grid-template-columns:1fr' }, [
+        el('span', { class: 'sub', text: (g.tur || 'Mesaj') + ' · ' + (g.zaman ? trTime(g.zaman) : '') }),
+        el('span', { style: 'white-space:pre-wrap;overflow-wrap:anywhere', text: g.metin || '' }),
+        g.yanit ? el('div', { class: 'yanit' }, [el('b', { text: 'Yanıt · ' + (g.yanitZaman ? trTime(g.yanitZaman) : '') }), el('div', { style: 'white-space:pre-wrap;overflow-wrap:anywhere', text: g.yanit })]) : el('span', { class: 'sub', text: 'Henüz yanıt yok' })
+      ]));
+    };
+    if (mesajlarim === null) {
+      const fs = FB.m.fs;
+      fs.getDocs(fs.query(fs.collection(FB.store, 'geribildirim'), fs.where('uid', '==', FB.user.uid), fs.limit(30)))
+        .then(q => { mesajlarim = q.docs.map(d => d.data()).sort((a, b) => (a.zaman < b.zaman ? 1 : -1)); doldur(); })
+        .catch(() => { mesajlarim = []; doldur(); });
+    }
+    doldur();
+    return card('Mesajlarım', kutu);
+  }
+
+  /* ---------- News written for the app: list, and one page per story (#haber-<id>) ---------- */
+  S.haberId = null;
+  const hashHaber = () => { const m = /^#haber-([A-Za-z0-9._~-]+)$/.exec(location.hash || ''); return m ? m[1] : null; };
+  async function haberleriYukle() {
+    if (!STANDALONE) return;
+    try { const r = await fetch('haberler.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); S.haberler = Array.isArray(j) ? j : (j.liste || []); } } catch (e) {}
+  }
+  function haberDetay(n) {
+    const held = new Set(S.p.pozisyonlar.map(p => String(p.kod).toUpperCase()));
+    const geri = el('button', { class: 'btn sm ghost', type: 'button', text: '← Haberler', onclick: () => { if (history.length > 1 && hashHaber()) history.back(); else { location.hash = ''; S.haberId = null; render(); } } });
+    return [
+      el('div', {}, [geri]),
+      el('article', { class: 'card haber-sayfa' }, [
+        el('div', { class: 'when', text: n.t ? trTime(n.t) : '' }),
+        el('h1', { text: n.baslik }),
+        el('p', { class: 'lead', text: n.ozet }),
+        ...(Array.isArray(n.metin) ? n.metin : [n.metin || '']).filter(Boolean).map(p => el('p', { text: p })),
+        (n.hisseler && n.hisseler.length) ? el('div', {}, [el('h2', { text: 'İlgili hisseler · bugün' }), el('div', { class: 'stk' }, n.hisseler.map(([k, pz]) => el('span', { class: held.has(k) ? 'mine' : '' }, [k, degSpan(k, pz || 'bist')])))]) : null,
+        (n.kaynaklar && n.kaynaklar.length) ? el('div', {}, [el('h2', { text: 'Kaynaklar' }), el('ul', { class: 'kaynak' }, n.kaynaklar.map(k => el('li', {}, [el('a', { href: k.url, target: '_blank', rel: 'noopener', text: k.ad || k.url })])))]) : null,
+        el('p', { class: 'small muted', style: 'margin:0', text: 'Bu metin, kaynak haberler okunarak yapay zekâ yardımıyla kısaca yeniden yazılmıştır; hata içerebilir. Yatırım tavsiyesi değildir. Ayrıntı için kaynaklara bak.' })
+      ])
+    ];
+  }
+
   function scrHesap() {
-    return [hesapCard(), dataCard(), geriBildirimCard(), gelenlerCard(), yasalCard(), S.loaded ? connectCard() : null];
+    return [hesapCard(), proCard(), portfoylerCard(), dataCard(), geriBildirimCard(), mesajlarimCard(), gelenlerCard(), yasalCard(), S.loaded ? connectCard() : null];
   }
 
   function scrGecmis() {
@@ -1147,7 +1511,7 @@ button { cursor: pointer; }
       el('span', { class: 'sub', text: GR.filter(gg => x.dagilim && x.dagilim[gg.k] > 0.5).map(gg => gg.n + ' ' + tl0(x.dagilim[gg.k])).join(' · ') || '—' }),
       el('button', { class: 'p muted', type: 'button', style: 'border:0;background:none;padding:0;text-decoration:underline', text: 'Sil', 'aria-label': trMonth(x.ay || x.id) + ' kaydını sil', onclick: (ev) => confirmInline(ev.currentTarget, () => delSub('eklemeler', x.id), 'Emin misin?') })
     ]))) : el('div', { class: 'empty' }, [el('b', { text: 'Henüz ekleme yok' }), 'Varlıklarda adet artırdığında o ayın eklemesi otomatik kaydedilir.']);
-    return [card('Özet', stats), card('Değer geçmişi', chart), card('Aylık eklemeler', list)];
+    return [card('Özet', stats), yillikOzetCard(), islemlerCard(), card('Değer geçmişi', chart), card('Aylık eklemeler', list)];
   }
 
   function dataCard() {
@@ -1158,16 +1522,16 @@ button { cursor: pointer; }
     ])]);
     const btns = el('div', { class: 'btns' }, [
       STANDALONE ? iconBtn('down', 'Yedek indir', 'ghost', () => {
-        const blob = new Blob([JSON.stringify({ surum: 2, p: S.p, eklemeler: S.ekl, gecmis: S.gec }, null, 1)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify({ surum: 3, p: S.p, eklemeler: S.ekl, gecmis: S.gec, islemler: S.isl }, null, 1)], { type: 'application/json' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'portfoy-defteri-' + ymd(new Date()) + '.json'; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Yedek indirildi');
       }) : S.dl ? iconBtn('down', 'Yedek indir', 'ghost', async () => {
-        try { await S.dl.save({ filename: 'portfoy-defteri-' + ymd(new Date()) + '.json', data: JSON.stringify({ surum: 2, p: S.p, eklemeler: S.ekl, gecmis: S.gec }, null, 1) }); toast('Yedek indirildi'); }
+        try { await S.dl.save({ filename: 'portfoy-defteri-' + ymd(new Date()) + '.json', data: JSON.stringify({ surum: 3, p: S.p, eklemeler: S.ekl, gecmis: S.gec, islemler: S.isl }, null, 1) }); toast('Yedek indirildi'); }
         catch (e) { if (e && e.code !== 'declined') toast('Yedek indirilemedi.'); }
       }) : null,
       iconBtn('up', 'Yedekten yükle', 'ghost', () => document.getElementById('jsonPick').click(), { style: S.dl || STANDALONE ? '' : 'grid-column:1/-1' })
     ]);
     const geri = !STANDALONE && S.mode !== 'bulut' ? el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', style: 'margin-top:10px;width:100%', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } }) : null;
-    return card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, geri]);
+    return card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, proAraclar(), geri]);
   }
 
   /* ---------- edit sheet (autosave) ---------- */
@@ -1388,12 +1752,14 @@ Kurallar:
       el('button', { class: 'btn', type: 'button', text: 'Yedeği yükle', onclick: async (ev) => {
         ev.currentTarget.disabled = true;
         S.p = { ...EMPTY(), ...data.p };
-        const oldE = S.ekl.map(x => x.id), oldG = S.gec.map(x => x.id);
+        const oldE = S.ekl.map(x => x.id), oldG = S.gec.map(x => x.id), oldI = S.isl.map(x => x.id);
         if (S.mode === 'bulut') { for (const id of oldE) await portRef().collection('eklemeler').doc(id).delete().catch(() => {}); for (const id of oldG) await portRef().collection('gecmis').doc(id).delete().catch(() => {}); }
-        S.ekl = []; S.gec = [];
+        if (S.mode === 'bulut') for (const id of oldI) await portRef().collection('islemler').doc(id).delete().catch(() => {});
+        S.ekl = []; S.gec = []; S.isl = [];
         await savePort();
         for (const x of data.eklemeler || []) if (x.id) await saveSub('eklemeler', x.id, strip(x));
         for (const x of data.gecmis || []) if (x.id) await saveSub('gecmis', x.id, strip(x));
+        if (S.mode === 'bulut') for (const x of data.islemler || []) if (x.id) { await portRef().collection('islemler').doc(x.id).set(strip(x)).catch(() => {}); S.isl.push(x); }
         sh.close(); render(); toast('Yedek yüklendi');
       } }),
       el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
@@ -1438,8 +1804,8 @@ Kurallar:
   /* ---------- Midas news ---------- */
   S.haberler = null;
   async function yanVeri() {
-    const hb = await readOrtak('haberler');
-    if (hb) S.haberler = Array.isArray(hb) ? hb : (hb.liste || null);
+    if (STANDALONE) await haberleriYukle();
+    else { const hb = await readOrtak('haberler'); if (hb) S.haberler = Array.isArray(hb) ? hb : (hb.liste || null); }
     render();
   }
   function degSpan(kod, pazar) {
@@ -1449,31 +1815,35 @@ Kurallar:
   }
   let sadeceBenim = false;
   function scrHaber() {
-    const hb = S.haberler;
+    const hb = S.haberler || [];
+    if (S.haberId) { const n = hb.find(x => x.id === S.haberId); if (n) return haberDetay(n); if (S.loaded && hb.length) S.haberId = null; }
     const held = new Set(S.p.pozisyonlar.map(p => String(p.kod).toUpperCase()));
     const bugun = ymd(new Date()), dun = ymd(new Date(Date.now() - 864e5));
-    const when = (t) => !t ? '' : t.slice(0, 10) === bugun ? 'Bugün' : t.slice(0, 10) === dun ? 'Dün' : trShort(t.slice(0, 10));
+    const when = (t) => !t ? '' : t.slice(0, 10) === bugun ? 'Bugün ' + t.slice(11, 16) : t.slice(0, 10) === dun ? 'Dün' : trShort(t.slice(0, 10));
     const chk = el('input', { type: 'checkbox', id: 'sadeceBenim', checked: sadeceBenim, onchange: (e) => { sadeceBenim = e.target.checked; render(); } });
     const head = card(null, [el('div', { class: 'filt' }, [
-      el('div', {}, [el('div', { style: 'font-weight:700', text: 'Midas\'ın Kulakları' }), el('div', { class: 'small muted', text: 'Son haberler ve ilgili hisselerin bugünkü değişimi' })]),
-      iconBtn('refresh', 'Yenile', 'ghost sm', () => guncelleTumu(false))
+      el('div', {}, [el('div', { style: 'font-weight:700', text: 'Piyasa haberleri' }), el('div', { class: 'small muted', text: 'Birkaç kaynaktan derlenip kısaca anlatılır; ilgili hisselerin bugünkü değişimiyle' })]),
+      iconBtn('refresh', 'Yenile', 'ghost sm', async () => { await haberleriYukle(); await guncelleTumu(false); })
     ]), held.size ? el('label', { class: 'chk', for: 'sadeceBenim', style: 'margin-top:12px' }, [chk, el('span', { text: 'Sadece portföyümdeki hisselerle ilgili olanlar' })]) : null]);
-    if (!hb || !hb.length) return [head, card(null, el('div', { class: 'empty' }, [el('b', { text: S.loaded ? 'Haberler henüz yüklenmedi' : 'Yükleniyor' }), 'Fiyatları güncelleyince haberler de gelir.']))];
-    let liste = hb;
-    if (sadeceBenim) liste = hb.filter(n => (n.h || []).some(([k]) => held.has(k)));
+    if (!hb.length) return [head, card(null, el('div', { class: 'empty' }, [el('b', { text: S.loaded ? 'Henüz haber yok' : 'Yükleniyor' }), 'Haberler hafta içi günde üç kez yenilenir.']))];
+    let liste = hb.filter(n => n.id && n.baslik);
+    if (sadeceBenim) liste = liste.filter(n => (n.hisseler || []).some(([k]) => held.has(k)));
     const items = liste.map(n => el('article', { class: 'nitem' }, [
-      el('div', { class: 'when', text: when(n.t) }),
-      el('a', { class: 't', href: n.u, target: '_blank', rel: 'noopener', text: n.b }),
-      (n.h && n.h.length) ? el('div', { class: 'stk' }, n.h.map(([k, pz]) => el('span', { class: held.has(k) ? 'mine' : '' }, [k, degSpan(k, pz)]))) : null
+      el('div', { class: 'when', text: when(n.t) + (n.kaynaklar && n.kaynaklar.length ? ' · ' + n.kaynaklar.map(k => k.ad).filter(Boolean).slice(0, 3).join(', ') : '') }),
+      el('a', { class: 't', href: '#haber-' + n.id, text: n.baslik }),
+      el('p', { class: 'oz', text: n.ozet || '' }),
+      (n.hisseler && n.hisseler.length) ? el('div', { class: 'stk' }, n.hisseler.map(([k, pz]) => el('span', { class: held.has(k) ? 'mine' : '' }, [k, degSpan(k, pz || 'bist')]))) : null
     ]));
     return [head, liste.length ? el('div', { class: 'news' }, items) : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Portföyünle ilgili haber yok' }), 'Son haberlerde portföyündeki hisseler geçmiyor.'])),
-      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Haberler Midas\'tan, değişimler TradingView\'den (BIST 15 dk gecikmeli). Habere dokununca Midas\'ta açılır.' })];
+      el('p', { class: 'small muted', style: 'margin:0;text-align:center', text: 'Haber metinleri kaynaklardan okunup yapay zekâ yardımıyla kısaca yeniden yazılır; yatırım tavsiyesi değildir. Değişimler TradingView\'den (BIST 15 dk gecikmeli).' })];
   }
+  window.addEventListener('hashchange', () => { const id = hashHaber(); S.haberId = id; if (id) S.tab = 'haber'; if (S.onay) { render(); window.scrollTo({ top: 0 }); } });
+  S.haberId = hashHaber(); if (S.haberId) S.tab = 'haber';
 
   /* ---------- launch consent and legal texts ----------
      Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
      The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
-  const YASAL_SURUM = '16 Ekim 2026 (4)';
+  const YASAL_SURUM = '16 Ekim 2026 (5)';
   const SORUMLU = 'Portföy Defteri geliştiricisi (GitHub: github.com/Cyexs)';
   const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
   S.onay = false; S.riza = false;
@@ -1490,6 +1860,7 @@ Kurallar:
       ['p', 'Uygulamanın geliştiricisi Sermaye Piyasası Kurulu\'ndan (SPK) izin almış bir kurum değildir ve yatırım danışmanlığı ya da portföy yönetimi hizmeti vermez.'],
       ['h', 'Hesaplamalar nasıl yapılıyor?'],
       ['ul', [
+        'Haberler sekmesindeki metinler, kaynak haberler okunarak yapay zekâ yardımıyla kısaca yeniden yazılır; hata, eksik ya da güncel olmayan bilgi içerebilir. Ayrıntı ve doğruluk için kaynaklarına bak.',
         'Uygulama hisse, fon ya da başka bir yatırım aracı önermez. Aylık bölüşüm hesabı yalnızca senin girdiğin hedef oranları uygulayan bir hesap makinesidir.'
       ]],
       ['h', 'Yatırımın riskleri'],
@@ -1516,6 +1887,7 @@ Kurallar:
       ['p', 'Ayrıntılar Risk Bildirimi\'nde yer alır ve bu şartların parçasıdır.'],
       ['h', '4. Hesap'],
       ['p', 'Uygulamayı hesapsız ya da Google veya e-posta hesabınla kullanabilirsin. Hesabının güvenliğinden ve şifrenin gizliliğinden sen sorumlusun. Hesabını ve verilerini istediğin an Uygulamadan silebilirsin. Geliştirici, bu şartlara aykırı kullanım hâlinde hesabı askıya alabilir ya da silebilir.'],
+      ['p', 'Pro özellikler (çoklu portföy, işlem defteri, yıllık özet, reel getiri, Excel ve yıllık karne) ücretli olarak yalnızca Google Play üzerinden sunulacaktır; satın alma, iade ve iptal Google Play kurallarına tabidir. Haberler sekmesindeki metinler kaynak haberlerin kısa özetleridir ve yapay zekâ yardımıyla yazılır.'],
       ['h', '5. Senin yükümlülüklerin'],
       ['ul', [
         '18 yaşından büyük olmalısın.',
@@ -1675,10 +2047,11 @@ Kurallar:
     const t = totals();
     document.getElementById('topTotal').textContent = S.p.pozisyonlar.length ? tl0(t.T) : '—';
     document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
+    const br = document.querySelector('.brand'); if (br) br.textContent = pro() && S.portfoyler.length > 1 ? aktifAd() : 'Portföy Defteri';
     const hb = document.getElementById('hesapBtn');
     if (hb) { const giris = STANDALONE && FB.user; hb.className = 'hesap-btn' + (giris ? ' giris' : ''); hb.textContent = ''; if (giris) hb.textContent = basHarf(); else hb.append(icon('kisi')); hb.title = giris ? 'Giriş yapıldı: ' + (FB.user.email || '') : 'Giriş yapılmadı'; hb.setAttribute('aria-label', hb.title); }
     const a = document.activeElement && document.activeElement.id;
-    if (a && (['tutar', 'kur', 'aylik', 'aiSoru', 'gb-metin'].includes(a) || /^h-/.test(a))) return;
+    if (a && (['tutar', 'kur', 'aylik', 'aiSoru', 'gb-metin'].includes(a) || /^(h-|yanit-)/.test(a))) return;
     main.textContent = '';
     if (!S.onay) { document.querySelector('.nav').hidden = true; document.getElementById('top').hidden = true; document.getElementById('banner').hidden = true; main.append(el('div', { class: 'screen' }, onayScreen())); return; }
     const gate = needsGate();

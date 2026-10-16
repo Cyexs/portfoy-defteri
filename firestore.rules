@@ -13,7 +13,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
-    // Feedback: anyone may send a short message; only the owner can read it, nobody can change it.
+    // Feedback: anyone may send a short message; the owner reads and replies, the sender reads their own.
     match /geribildirim/{id} {
       allow create: if request.resource.data.keys().hasOnly(['metin', 'tur', 'zaman', 'uid', 'eposta'])
         && request.resource.data.metin is string
@@ -21,9 +21,16 @@ service cloud.firestore {
         && request.resource.data.tur is string && request.resource.data.tur.size() <= 20
         && (request.resource.data.uid == '' || (request.auth != null && request.resource.data.uid == request.auth.uid))
         && (request.resource.data.eposta == '' || (request.auth != null && request.resource.data.eposta == request.auth.token.email));
-      allow read: if request.auth != null
-        && get(/databases/$(database)/documents/roller/$(request.auth.uid)).data.rol == 'sahip';
-      allow update, delete: if false;
+      // The owner reads everything; a signed-in sender reads their own messages (and the replies).
+      allow read: if request.auth != null && (
+        resource.data.uid == request.auth.uid
+        || get(/databases/$(database)/documents/roller/$(request.auth.uid)).data.rol == 'sahip');
+      // Only the owner may add a reply, and only the reply fields change.
+      allow update: if request.auth != null
+        && get(/databases/$(database)/documents/roller/$(request.auth.uid)).data.rol == 'sahip'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['yanit', 'yanitZaman'])
+        && request.resource.data.yanit is string && request.resource.data.yanit.size() <= 2000;
+      allow delete: if false;
     }
   }
 }

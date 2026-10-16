@@ -7,7 +7,7 @@ Her çalıştığında fiyatlar.json dosyasını yeniler:
   - piyasa: Borsa İstanbul hisseleri (TradingView, 15 dk gecikmeli), ABD hisse/ETF'leri (TradingView),
             TEFAS yatırım fonlarının son fiyatları (tefas.gov.tr), günlük % değişimler.
   - (Öneri listeleri 16 Ekim 2026'da kaldırıldı; uygulama hisse ya da fon önermez.)
-  - haberler: Midas'ın son haber başlıkları (getmidas.com RSS) ve başlıkta geçen hisse kodları.
+  - (Haber başlıkları artık bu dosyada yok; haberler.json ayrı görevle yazılır.)
 Bir kaynağa ulaşılamazsa o bölümün önceki değeri korunur. Sadece Python standart kütüphanesi kullanılır.
 """
 import json
@@ -133,92 +133,6 @@ def tefas():
 HABER_DISI = {"BIST", "TCMB", "ABD", "FED", "USD", "EUR", "TRY", "GSYH", "TÜFE", "TUFE", "KAP", "SPK", "CEO", "IPO", "ETF", "MIDAS", "AB", "BM", "IMF", "OPEC", "NATO", "AI", "GDP", "CPI", "PMI", "ECB", "BOJ", "THE", "AND", "FOR"}
 
 
-def _hisseler(baslik, ozet, bist, abd):
-    import re
-    hisseler = []
-    def ekle(kod, min_uzunluk):
-        if len(kod) < min_uzunluk or kod in HABER_DISI or any(h[0] == kod for h in hisseler):
-            return
-        if kod in bist:
-            hisseler.append([kod, "bist"])
-        elif kod in abd:
-            hisseler.append([kod, "abd"])
-    for kod in re.findall(r"\b[A-ZÇĞİÖŞÜ0-9]{2,6}\b", baslik):
-        ekle(kod, 2)
-    for kod in re.findall(r"\b[A-Z]{4,6}\b", ozet):
-        if len(hisseler) >= 6:
-            break
-        if kod in bist:
-            ekle(kod, 4)
-    return hisseler[:6]
-
-
-AYLAR = {"ocak": 1, "şubat": 2, "mart": 3, "nisan": 4, "mayıs": 5, "haziran": 6, "temmuz": 7, "ağustos": 8,
-         "eylül": 9, "ekim": 10, "kasım": 11, "aralık": 12}
-
-
-def _metin(html_):
-    import re, html as _h
-    html_ = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html_)
-    return re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", html_))).strip()
-
-
-def _haber_hisseleri(link, bist, abd):
-    """Haber sayfasının metninde en çok geçen hisse kodları (Midas'taki 'ilgili hisseler' gibi)."""
-    import re
-    from collections import Counter
-    ham = getir(link).decode("utf-8", "replace")
-    m = re.search(r"(?is)<article[^>]*>(.*?)</article>", ham) or re.search(r'(?is)<div[^>]+class="[^"]*(?:entry-content|post-content|content-detail|detail-content)[^"]*"[^>]*>(.*)', ham)
-    govde = _metin(m.group(1) if m else ham)[:20000]
-    sayac = Counter(k for k in re.findall(r"\b[A-Z]{4,6}\b", govde) if k in bist and k not in HABER_DISI)
-    return [[k, "bist"] for k, _ in sayac.most_common(4)]
-
-
-def midas_haberleri(bist, abd, eski_haberler):
-    """Midas'ın Kulakları sayfasındaki son haberler. Haber metnini saklamıyoruz: başlık, bağlantı, tarih
-    ve ilgili hisse kodları. Daha önce okunan haber sayfaları tekrar istenmez."""
-    import re
-    ham = getir("https://www.getmidas.com/midasin-kulaklari/").decode("utf-8", "replace")
-    onceki = {h["u"]: h for h in (eski_haberler or [])}
-    gorulen, haberler = set(), []
-    for m in re.finditer(r'(?is)<a[^>]+href="(https://www\.getmidas\.com/midasin-kulaklari/[^"#?]+-p-(\d+)/?)"[^>]*>(.*?)</a>', ham):
-        link, no, ic = m.group(1), int(m.group(2)), m.group(3)
-        if link in gorulen:
-            continue
-        b = re.search(r"(?is)<h[1-4][^>]*>(.*?)</h[1-4]>", ic)
-        baslik = _metin(b.group(1)) if b else ""
-        if not baslik:
-            alt = re.search(r'alt="([^"]+)"', ic)
-            baslik = _metin(alt.group(1)) if alt else ""
-        if not baslik:
-            continue
-        gorulen.add(link)
-        tarih = None
-        t = re.search(r"([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+(\d{1,2}),\s*(\d{4})", _metin(ic))
-        if t and t.group(1).lower() in AYLAR:
-            tarih = f"{t.group(3)}-{AYLAR[t.group(1).lower()]:02d}-{int(t.group(2)):02d}"
-        haberler.append({"b": baslik[:160], "u": link, "t": tarih, "n": no})
-    haberler.sort(key=lambda h: -h["n"])
-    haberler = haberler[:20]
-    if not haberler:
-        raise ValueError("haber listesi okunamadı")
-    for h in haberler:
-        h["h"] = _hisseler(h["b"], "", bist, abd)
-        if h["u"] in onceki and onceki[h["u"]].get("hs") is not None:
-            ek = onceki[h["u"]]["hs"]
-        else:
-            try:
-                ek = _haber_hisseleri(h["u"], bist, abd)
-            except Exception:
-                ek = []
-        h["hs"] = ek
-        for kod, pazar in ek:
-            if len(h["h"]) < 6 and not any(x[0] == kod for x in h["h"]):
-                h["h"].append([kod, pazar])
-        h.pop("n", None)
-    return haberler
-
-
 def main():
     try:
         with open(DOSYA, encoding="utf-8") as f:
@@ -277,13 +191,8 @@ def main():
     piyasa["kaynak"] = {"bist": "TradingView (15 dk gecikmeli)", "abd": "TradingView", "fon": "TEFAS"}
     yeni["piyasa"] = piyasa
     yeni.pop("oneriler", None)
-    try:
-        yeni["haberler"] = midas_haberleri(piyasa.get("bist") or {}, piyasa.get("abd") or {}, eski.get("haberler"))
-        yeni["haberZaman"] = zaman
-        print("haber", len(yeni["haberler"]))
-    except Exception as e:
-        print("Haberler okunamadı:", e)
-        hatalar["haber"] = str(e)[:200]
+    # Haberler artık burada toplanmıyor: haberler.json, kaynakları kendi cümleleriyle özetleyen ayrı bir görevle yazılır.
+    yeni.pop("haberler", None); yeni.pop("haberZaman", None)
     yeni["hatalar"] = hatalar
 
     temiz = lambda v: {kk: vv for kk, vv in v.items() if "aman" not in kk} if isinstance(v, dict) else v
