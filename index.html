@@ -286,6 +286,8 @@ button { cursor: pointer; }
 .onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .warn { color: var(--bad); font-size: 12.5px; }
 .status.warn { color: var(--bad); }
+.davet { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1.5px solid var(--accent); box-shadow: none; }
+.davet .btn { flex: none; }
 .ayrac { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 12.5px; }
 .ayrac::before, .ayrac::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 /* v6: launch consent, legal texts */
@@ -808,6 +810,14 @@ button { cursor: pointer; }
     return card(null, el('div', { class: 'onb' }, kids));
   }
 
+  // Device-only users see a short invitation to sign in, so the account option is never hidden behind an old choice.
+  function hesapDavet() {
+    if (!STANDALONE || !FB.hazir || FB.user || !S.loaded) return null;
+    return el('section', { class: 'card davet' }, [
+      el('div', {}, [el('b', { text: 'Verilerin bu telefonda duruyor' }), el('p', { class: 'small muted', style: 'margin:4px 0 0', text: 'Hesabınla giriş yaparsan telefon değişse de kaybolmaz; mevcut varlıkların hesaba taşınır.' })]),
+      el('button', { class: 'btn sm', type: 'button', text: 'Giriş yap', onclick: () => girisSheet() })
+    ]);
+  }
   function scrOzet() {
     const t = totals(), has = S.p.pozisyonlar.length > 0;
     const nf = nextFirst(); const days = Math.ceil((nf - new Date()) / 864e5);
@@ -823,7 +833,7 @@ button { cursor: pointer; }
       el('div', { class: 'chips' }, [has ? kzChip(t.kz, t.kzp) : null, el('span', { class: 'chip plain', text: 'Sonraki ekleme: ' + nf.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + days + ' gün' })]),
       has ? el('div', { class: 'info' }, [guncelleniyor ? 'Fiyatlar güncelleniyor…' : (sg ? 'Güncellendi: ' + trTime(sg.zaman) : 'Henüz güncellenmedi') + (kurN ? ' · $1 = ₺' + n2(kurN, 2) : '') + (gram ? ' · Gram altın ₺' + n2(gram, 0) : '') + (sg && sg.eksik && sg.eksik.length ? ' · Fiyatı bulunamayan: ' + sg.eksik.join(', ') : '')]) : null
     ]);
-    if (!has) return [hero, S.loaded ? onboarding() : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Defterin açılıyor' }), 'Kayıtların yükleniyor.'])), S.loaded ? connectCard() : null];
+    if (!has) return [hero, S.loaded ? onboarding() : card(null, el('div', { class: 'empty' }, [el('b', { text: 'Defterin açılıyor' }), 'Kayıtların yükleniyor.'])), S.loaded ? connectCard() : null, hesapDavet()];
 
     const parts = GR.map(g => ({ v: t.g[g.k], c: col(g.k) }));
     const legend = el('div', { class: 'legend' }, GR.map(g => {
@@ -847,7 +857,7 @@ button { cursor: pointer; }
       hist = card('Değer geçmişi', [lineChart([{ v: pts.map(g => g.deger_tl), c: 'var(--accent)' }, { v: pts.map(g => g.maliyet_tl), c: 'var(--ink-2)', dash: '4 4' }], pts.map(g => trShort(g.tarih)), { fmt: v => Math.round(v / 1000) + 'B', h: 140, label: 'Değer geçmişi' }),
         el('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'Düz çizgi değer, kesikli çizgi yatırdığın tutar.' })]);
     }
-    return [hero, alloc, hist, movers];
+    return [hesapDavet(), hero, alloc, hist, movers];
   }
 
   function kurCard() {
