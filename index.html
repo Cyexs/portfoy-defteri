@@ -170,7 +170,7 @@ button { cursor: pointer; }
 
 /* Bottom nav */
 .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-.nav-in { max-width: 34rem; margin-inline: auto; display: grid; grid-template-columns: repeat(6, 1fr); height: var(--nav-h); }
+.nav-in { max-width: 34rem; margin-inline: auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; height: var(--nav-h); }
 .nav button { font-size: 11px; }
 .nav button { border: 0; background: none; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
 .nav button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -285,6 +285,9 @@ button { cursor: pointer; }
 .onb b { font-family: var(--f-display); font-weight: 400; font-size: 20px; }
 .onb p { margin: 0; color: var(--ink-2); font-size: 14px; }
 .warn { color: var(--bad); font-size: 12.5px; }
+.status.warn { color: var(--bad); }
+.ayrac { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 12.5px; }
+.ayrac::before, .ayrac::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 /* v6: launch consent, legal texts */
 .onay { display: grid; gap: 16px; padding-block: 20px 32px; }
 .onay h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 7.5vw, 34px); line-height: 1.12; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
@@ -396,6 +399,138 @@ button { cursor: pointer; }
   }
   const aiVar = () => STANDALONE ? !!API.url : !!(S.sample && !S.sampleDenied);
   const gorselVar = () => !STANDALONE || !!API.url;
+  /* ---------- accounts (GitHub version): Google or e-mail sign-in, notebook kept in Firestore ----------
+     Turned on by firebase-ayar.json next to the page; without it the app stays device-only. */
+  const FB_SURUM = '10.14.1';
+  const FB = { hazir: false, user: null, db: null, auth: null, m: null };
+  async function fbInit() {
+    if (!STANDALONE || FB.m) return;
+    let ayar = null;
+    try { const r = await fetch('firebase-ayar.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) ayar = await r.json(); } catch (e) {}
+    if (!ayar || !ayar.apiKey || !ayar.projectId) return;
+    try {
+      const u = (n) => 'https://www.gstatic.com/firebasejs/' + FB_SURUM + '/firebase-' + n + '.js';
+      const [app, auth, fs] = await Promise.all([import(u('app')), import(u('auth')), import(u('firestore'))]);
+      const a = app.initializeApp(ayar);
+      FB.auth = auth.getAuth(a); FB.auth.languageCode = 'tr';
+      let store; try { store = fs.initializeFirestore(a, { localCache: fs.persistentLocalCache() }); } catch (e) { store = fs.getFirestore(a); }
+      FB.m = { auth, fs }; FB.store = store; FB.hazir = true;
+      try { const rr = await auth.getRedirectResult(FB.auth); if (rr && rr.user) FB.user = rr.user; } catch (e) {}
+      if (!FB.user) FB.user = await new Promise((res) => { const un = auth.onAuthStateChanged(FB.auth, (us) => { un(); res(us); }); });
+      if (FB.user) FB.db = fsAdapter(fs, store);
+    } catch (e) { FB.hazir = false; FB.user = null; }
+  }
+  // Same small surface the rest of the app already uses for cloud storage.
+  function fsAdapter(fs, store) {
+    const snapDoc = (s) => ({ exists: s.exists(), data: () => s.data() });
+    const d = (ref) => ({
+      get: async () => snapDoc(await fs.getDoc(ref)),
+      set: (data) => fs.setDoc(ref, data),
+      delete: () => fs.deleteDoc(ref),
+      onSnapshot: (ok, err) => fs.onSnapshot(ref, (s) => ok(snapDoc(s)), err),
+      collection: (name) => c(fs.collection(ref, name), [])
+    });
+    const c = (ref, cons) => ({
+      doc: (id) => d(fs.doc(ref, id)),
+      limit: (n) => c(ref, [...cons, fs.limit(n)]),
+      orderBy: (f, y) => c(ref, [...cons, fs.orderBy(f, y)]),
+      onSnapshot: (ok, err) => fs.onSnapshot(fs.query(ref, ...cons), (q) => ok({ docs: q.docs.map(x => ({ id: x.id, data: () => x.data() })) }), err)
+    });
+    return { doc: (path) => d(fs.doc(store, path)) };
+  }
+  const AUTH_HATA = {
+    'auth/invalid-email': 'E-posta adresi geçersiz.', 'auth/missing-email': 'E-posta adresini yaz.', 'auth/missing-password': 'Şifreni yaz.',
+    'auth/weak-password': 'Şifre en az 6 karakter olmalı.', 'auth/email-already-in-use': 'Bu e-postayla zaten bir hesap var; Giriş yap\'a bas.',
+    'auth/invalid-credential': 'E-posta ya da şifre yanlış.', 'auth/wrong-password': 'E-posta ya da şifre yanlış.', 'auth/user-not-found': 'Bu e-postayla bir hesap yok; Kayıt ol\'a bas.',
+    'auth/too-many-requests': 'Çok fazla deneme yapıldı; birkaç dakika sonra tekrar dene.', 'auth/network-request-failed': 'İnternet bağlantısı yok gibi görünüyor.',
+    'auth/popup-closed-by-user': 'Google girişi yarıda kaldı; tekrar dene.', 'auth/cancelled-popup-request': 'Google girişi yarıda kaldı; tekrar dene.',
+    'auth/unauthorized-domain': 'Bu adres Firebase\'de izinli değil (Authentication → Settings → Authorized domains).', 'auth/operation-not-allowed': 'Bu giriş yöntemi Firebase\'de açılmamış.',
+    'auth/requires-recent-login': 'Güvenlik için çıkış yapıp yeniden giriş yap, sonra tekrar dene.'
+  };
+  const authMesaj = (e) => AUTH_HATA[e && e.code] || 'İşlem tamamlanamadı; tekrar dene.';
+  function girisTamam() {
+    const k = onayKaydi() || {};
+    try { localStorage.setItem('pd-onay', JSON.stringify({ ...k, bulutRiza: true, bulutRizaZaman: new Date().toISOString() })); } catch (e) {}
+    setGiris('hesap'); toast('Giriş yapıldı'); setTimeout(() => location.reload(), 500);
+  }
+  function girisSheet() {
+    if (!FB.hazir) { toast('Hesap girişi şu an kullanılamıyor.'); return; }
+    const A = FB.m.auth;
+    const st = el('div', { class: 'status', role: 'status' });
+    const yaz = (t, cls) => { st.className = 'status' + (cls ? ' ' + cls : ''); st.textContent = t; };
+    const rz = el('input', { type: 'checkbox', id: 'bulut-riza' });
+    const rizaVar = () => { if (rz.checked) return true; yaz('Devam etmek için verilerinin hesabında saklanmasına onay ver.', 'warn'); rz.focus(); return false; };
+    const busy = (b) => sh.sheet.querySelectorAll('button.btn').forEach(x => { x.disabled = b; });
+    const google = el('button', { class: 'btn', type: 'button', text: 'Google ile devam et' });
+    google.addEventListener('click', async () => {
+      if (!rizaVar()) return;
+      const p = new A.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
+      busy(true); yaz('Google açılıyor…');
+      try { await A.signInWithPopup(FB.auth, p); girisTamam(); }
+      catch (e) {
+        if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
+          const k = onayKaydi() || {}; try { localStorage.setItem('pd-onay', JSON.stringify({ ...k, bulutRiza: true, bulutRizaZaman: new Date().toISOString() })); } catch (er) {}
+          setGiris('hesap'); try { await A.signInWithRedirect(FB.auth, p); return; } catch (er) { e = er; }
+        }
+        busy(false); yaz(authMesaj(e), 'warn');
+      }
+    });
+    const ep = el('input', { id: 'g-eposta', type: 'email', autocomplete: 'email', inputmode: 'email', autocapitalize: 'off', spellcheck: 'false' });
+    const sf = el('input', { id: 'g-sifre', type: 'password', autocomplete: 'current-password', minlength: '6' });
+    const degerler = () => ({ e: ep.value.trim(), s: sf.value });
+    const epostaIle = async (kayit) => {
+      const { e, s } = degerler();
+      if (!e) { yaz('E-posta adresini yaz.', 'warn'); ep.focus(); return; }
+      if (!s) { yaz('Şifreni yaz.', 'warn'); sf.focus(); return; }
+      if (!rizaVar()) return;
+      busy(true); yaz(kayit ? 'Hesabın oluşturuluyor…' : 'Giriş yapılıyor…');
+      try {
+        if (kayit) { const r = await A.createUserWithEmailAndPassword(FB.auth, e, s); try { await A.sendEmailVerification(r.user); } catch (er) {} }
+        else await A.signInWithEmailAndPassword(FB.auth, e, s);
+        girisTamam();
+      } catch (er) { busy(false); yaz(authMesaj(er), 'warn'); }
+    };
+    const unuttum = el('button', { class: 'lnk', type: 'button', text: 'Şifremi unuttum', onclick: async () => {
+      const { e } = degerler(); if (!e) { yaz('Önce e-posta adresini yaz, sonra Şifremi unuttum\'a bas.', 'warn'); ep.focus(); return; }
+      try { await A.sendPasswordResetEmail(FB.auth, e); yaz('Şifre yenileme bağlantısı ' + e + ' adresine gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.', 'ok'); }
+      catch (er) { yaz(authMesaj(er), 'warn'); }
+    } });
+    const sh = openSheet('Giriş yap ya da kayıt ol', [
+      el('p', { class: 'small muted', style: 'margin:0', text: S.p.pozisyonlar.length ? 'Bu telefondaki varlıkların, hesabın boşsa hesabına taşınır.' : 'Hesabın varsa giriş yap; yoksa aynı bilgilerle kayıt ol.' }),
+      el('label', { class: 'chk', for: 'bulut-riza' }, [rz, el('span', {}, ['Verilerimin (e-posta adresim ve portföy bilgilerim) hesabımda saklanması için Google Firebase\'e aktarılmasına ', lnk('riza', 'Açık Rıza Metni'), ' kapsamında rıza veriyorum.'])]),
+      google,
+      el('div', { class: 'ayrac', text: 'ya da e-postayla' }),
+      el('div', { class: 'fgrid' }, [
+        el('div', { class: 'field full' }, [el('label', { for: 'g-eposta', text: 'E-posta' }), ep]),
+        el('div', { class: 'field full' }, [el('label', { for: 'g-sifre', text: 'Şifre (en az 6 karakter)' }), sf])
+      ]),
+      el('div', { class: 'btns' }, [
+        el('button', { class: 'btn', type: 'button', text: 'Giriş yap', onclick: () => epostaIle(false) }),
+        el('button', { class: 'btn ghost', type: 'button', text: 'Kayıt ol', onclick: () => epostaIle(true) })
+      ]),
+      el('div', { style: 'text-align:center' }, [unuttum]),
+      st,
+      el('button', { class: 'btn ghost', type: 'button', text: 'Vazgeç', onclick: () => sh.close() })
+    ]);
+  }
+  async function cikisYap() {
+    try { if (FB.m && FB.auth) await FB.m.auth.signOut(FB.auth); } catch (e) {}
+    try { localStorage.removeItem('pd-onay'); } catch (e) {}
+    setGiris(null); toast('Çıkış yapıldı'); setTimeout(() => location.reload(), 500);
+  }
+  async function hesabiSil() {
+    if (!FB.user) return;
+    try {
+      for (const x of S.ekl) await portRef().collection('eklemeler').doc(x.id).delete();
+      for (const x of S.gec) await portRef().collection('gecmis').doc(x.id).delete();
+      await portRef().delete();
+    } catch (e) { toast('Veriler silinemedi; internetini kontrol edip tekrar dene.'); return; }
+    try { await FB.m.auth.deleteUser(FB.user); }
+    catch (e) { toast(e && e.code === 'auth/requires-recent-login' ? 'Verilerin silindi. Hesabı da silmek için çıkış yapıp yeniden giriş yap ve tekrar dene.' : authMesaj(e)); return; }
+    try { localStorage.removeItem(LS); localStorage.removeItem('pd-onay'); localStorage.removeItem('pd-giris'); localStorage.removeItem('pd-tab'); } catch (e) {}
+    toast('Hesabın ve tüm verilerin silindi'); setTimeout(() => location.reload(), 900);
+  }
+
   const EMPTY = () => ({ kur: 49.28, kurKaynak: 'elle', kurTarih: '', aylik: 2000, hedef: { kuresel: 30, bist: 30, kira: 30, altin: 10 }, pozisyonlar: [] });
   const S = {
     loaded: false, mode: 'yukleniyor', db: null, uid: null, sample: null, imgLim: null, dl: null, ortakKur: null, ortakAltin: null,
@@ -589,12 +724,13 @@ button { cursor: pointer; }
     render();
     const cl = window.claude;
     const use = (n) => cl && cl.use ? cl.use(n).catch(() => null) : Promise.resolve(null);
-    const [db, user, sample, dl] = await Promise.all([use('db'), use('user'), use('sample'), use('downloads')]);
+    let [db, user, sample, dl] = await Promise.all([use('db'), use('user'), use('sample'), use('downloads')]);
+    if (STANDALONE) { await fbInit(); if (FB.user && FB.db) db = FB.db; }
     S.dl = dl; S.sample = sample;
     if (sample && sample.limits) { try { const l = await sample.limits(); S.imgLim = l && l.images ? l.images : null; } catch (e) { S.imgLim = null; } }
     try { const perms = await use('permissions'); if (perms) S.sampleDenied = (await perms.state('sample')) === 'denied'; } catch (e) {}
     S.db = db;
-    const uid = user ? await user.id() : null;
+    const uid = STANDALONE ? (FB.user ? FB.user.uid : null) : (user ? await user.id() : null);
     await apiYukle();
     S.ortakKur = await readOrtakKur();
     S.ortakAltin = await readOrtak('altin');
@@ -910,7 +1046,7 @@ button { cursor: pointer; }
     const cloud = S.mode === 'bulut';
     const modeLine = el('div', { class: 'mode' }, [icon(cloud ? 'cloud' : 'phone'), el('div', {}, [
       el('div', { style: 'font-weight:700', text: cloud ? 'Hesabına kaydediliyor' : 'Bu cihazda kaydediliyor' }),
-      el('div', { class: 'muted', text: cloud ? 'Verilerin claude.ai hesabına bağlı ve sadece sana görünür. Hangi cihazdan açarsan aç aynı defteri görürsün.' : (STANDALONE ? 'Verilerin bu telefonda, uygulamanın içinde duruyor; başka kimse göremez.' : 'Verilerin bu telefonun tarayıcısında duruyor; başka kimse göremez.') + ' Tarayıcı verisini silersen ya da telefon değiştirirsen kaybolur, o yüzden ara ara yedek indir.' })
+      el('div', { class: 'muted', text: cloud ? (STANDALONE && FB.user ? 'Verilerin ' + (FB.user.email || 'Google') + ' hesabına bağlı ve sadece sana görünür. Hangi cihazdan giriş yaparsan yap aynı defteri görürsün.' : 'Verilerin claude.ai hesabına bağlı ve sadece sana görünür. Hangi cihazdan açarsan aç aynı defteri görürsün.') : (STANDALONE ? 'Verilerin bu telefonda, uygulamanın içinde duruyor; başka kimse göremez.' : 'Verilerin bu telefonun tarayıcısında duruyor; başka kimse göremez.') + ' Tarayıcı verisini silersen ya da telefon değiştirirsen kaybolur, o yüzden ara ara yedek indir.' })
     ])]);
     const btns = el('div', { class: 'btns' }, [
       STANDALONE ? iconBtn('down', 'Yedek indir', 'ghost', () => {
@@ -922,7 +1058,11 @@ button { cursor: pointer; }
       }) : null,
       iconBtn('up', 'Yedekten yükle', 'ghost', () => document.getElementById('jsonPick').click(), { style: S.dl || STANDALONE ? '' : 'grid-column:1/-1' })
     ]);
-    const cikis = el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', style: 'margin-top:10px', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } });
+    const cikis = STANDALONE && FB.user
+      ? el('button', { class: 'btn ghost', type: 'button', text: 'Çıkış yap', style: 'margin-top:10px', onclick: () => cikisYap() })
+      : el('div', { style: 'display:grid;gap:10px;margin-top:10px' }, [
+          STANDALONE && FB.hazir ? el('button', { class: 'btn', type: 'button', text: 'Hesabınla giriş yap (verilerin taşınır)', onclick: () => girisSheet() }) : null,
+          el('button', { class: 'btn ghost', type: 'button', text: 'Giriş ekranına dön', onclick: () => { setGiris(null); S.tab = 'ozet'; render(); window.scrollTo({ top: 0 }); } })]);
     return el('div', { style: 'display:grid;gap:14px' }, [card('Veri ve yedek', [modeLine, el('div', { style: 'height:14px' }), btns, (STANDALONE || S.mode !== 'bulut') ? cikis : null]), yasalCard(), S.loaded ? connectCard() : null]);
   }
 
@@ -1160,7 +1300,7 @@ Kurallar:
   const CLAUDE_URL = 'https://claude.ai/artifact/NNJ4jDTu7Fd63VRLGaVg5D';
   const girisSecimi = () => { try { return localStorage.getItem('pd-giris'); } catch (e) { return 'cihaz'; } };
   const setGiris = (v) => { try { if (v) localStorage.setItem('pd-giris', v); else localStorage.removeItem('pd-giris'); } catch (e) {} };
-  const needsGate = () => S.loaded && !girisSecimi() && !(!STANDALONE && (S.mode === 'bulut' || connected()));
+  const needsGate = () => S.loaded && (!girisSecimi() || (STANDALONE && girisSecimi() === 'hesap' && S.mode !== 'bulut')) && !(STANDALONE && S.mode === 'bulut') && !(!STANDALONE && (S.mode === 'bulut' || connected()));
   function gateScreen() {
     const mark = el('div', { class: 'mark', 'aria-hidden': 'true' });
     mark.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="#6E9CF0" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-0.50" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#EA7C62" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-14.64" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#3FBF9C" stroke-width="2.4" stroke-dasharray="13.14 47.12" stroke-dashoffset="-28.77" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="#E0B547" stroke-width="2.4" stroke-dasharray="3.71 47.12" stroke-dashoffset="-42.91" transform="rotate(-90 12 12)"/><text x="12.15" y="15.6" text-anchor="middle" font-family="Young Serif, Georgia, serif" font-size="10.5" fill="#EEF2EF">P</text></svg>';
@@ -1171,12 +1311,13 @@ Kurallar:
       else connectNow(claudeBtn);
     });
     const devamBtn = el('button', { class: 'btn ghost', type: 'button', text: 'Hesapsız devam et', onclick: () => { setGiris('cihaz'); render(); } });
-    if (STANDALONE && API.url) return [el('div', { class: 'gate' }, [
+    if (STANDALONE) return [el('div', { class: 'gate' }, [
       mark,
       el('h1', { text: 'Portföyün tek defterde' }),
       el('p', { class: 'lead', text: 'Midas\'taki hisse, fon ve altınlarını takip et; her ay ne kadar, nereye ekleyeceğini gör.' }),
-      el('div', { class: 'door primary' }, [el('b', { text: 'Hesap gerekmez' }), el('ul', {}, [el('li', { text: 'Tüm takip özellikleri, canlı kur ve altın' }), el('li', { text: 'Claude portföyünü yorumlar (günlük sınırlı)' }), el('li', { text: 'Ekran görüntüsünden varlıklarını okur' }), el('li', { text: 'Verilerin sadece bu telefonda kalır' })]),
-        el('button', { class: 'btn', type: 'button', text: 'Başla', onclick: () => { setGiris('cihaz'); render(); } })]),
+      FB.hazir ? el('div', { class: 'door primary' }, [el('b', { text: 'Hesabınla' }), el('ul', {}, [el('li', { text: 'Verilerin hesabında saklanır; telefon değişse de kaybolmaz' }), el('li', { text: 'Aynı defteri her cihazdan açarsın' }), el('li', { text: 'Google hesabınla ya da e-postanla' })]),
+        el('button', { class: 'btn', type: 'button', text: 'Giriş yap ya da kayıt ol', onclick: () => girisSheet() })]) : null,
+      el('div', { class: 'door' + (FB.hazir ? '' : ' primary') }, [el('b', { text: 'Hesapsız' }), el('ul', {}, [el('li', { text: 'Tüm takip özellikleri, canlı kur ve altın' }), el('li', { text: 'Verilerin sadece bu telefonda kalır' }), FB.hazir ? el('li', { text: 'İstediğin zaman hesaba geçersin; verilerin taşınır' }) : null]), devamBtn]),
       el('p', { class: 'fine' }, ['Yatırım tavsiyesi değildir; kararlar sana aittir. ', lnk('sartlar'), ' · ', lnk('kvkk', 'KVKK')])
     ])];
     return [el('div', { class: 'gate' }, [
@@ -1381,13 +1522,13 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   /* ---------- launch consent and legal texts ----------
      Shown on every launch. Nothing is loaded and no account is touched until the required boxes are ticked.
      The optional explicit consent (KVKK md. 5 and 9) gates every Claude feature that sends data to Anthropic. */
-  const YASAL_SURUM = '15 Ekim 2026';
+  const YASAL_SURUM = '16 Ekim 2026';
   const SORUMLU = 'Portföy Defteri geliştiricisi';
   const ILETISIM = 'https://github.com/Cyexs/portfoy-defteri/issues';
   S.onay = false; S.riza = false;
   const OK = { risk: false, sart: false, kvkk: false, riza: false };
   const onayKaydi = () => { try { return JSON.parse(localStorage.getItem('pd-onay') || 'null'); } catch (e) { return null; } };
-  const onayYaz = () => { try { localStorage.setItem('pd-onay', JSON.stringify({ zaman: new Date().toISOString(), surum: YASAL_SURUM, riza: S.riza })); } catch (e) {} };
+  const onayYaz = () => { try { const k = onayKaydi() || {}; localStorage.setItem('pd-onay', JSON.stringify({ ...(k.surum === YASAL_SURUM ? k : {}), zaman: new Date().toISOString(), surum: YASAL_SURUM, riza: S.riza })); } catch (e) {} };
   const RISK_BEYAN = 'Buradaki önerilerin yatırım tavsiyesi olmadığını, yapay zekâ ve otomatik kriterlerle oluşturulmuş öneriler olduğunu biliyorum. Yapacağım her türlü yatırımda riskin tamamen şahsıma ait olduğunu kabul ediyorum.';
   const SPK_NOTU = 'Burada yer alan yatırım bilgi, yorum ve tavsiyeleri yatırım danışmanlığı kapsamında değildir. Yatırım danışmanlığı hizmeti; aracı kurumlar, portföy yönetim şirketleri, mevduat kabul etmeyen bankalar ile müşteri arasında imzalanacak yatırım danışmanlığı sözleşmesi çerçevesinde sunulmaktadır. Burada yer alan yorum ve tavsiyeler, yorum ve tavsiyede bulunanların kişisel görüşlerine dayanmaktadır. Bu görüşler mali durumunuz ile risk ve getiri tercihlerinize uygun olmayabilir. Bu nedenle, sadece burada yer alan bilgilere dayanılarak yatırım kararı verilmesi beklentilerinize uygun sonuçlar doğurmayabilir.';
 
@@ -1424,21 +1565,21 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['h', '3. Yatırım tavsiyesi değildir'],
       ['p', SPK_NOTU],
       ['p', 'Ayrıntılar Risk Bildirimi\'nde yer alır ve bu şartların parçasıdır.'],
-      ['h', '4. Yapay zekâ içerikleri'],
-      ['p', 'Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma özellikleri Anthropic PBC\'nin yapay zekâ hizmetini kullanır. claude.ai sürümünde senin claude.ai hesabınla çalışır ve kendi kullanım hakkından düşer. Uygulama sürümünde Geliştiricinin Cloudflare üzerindeki ara sunucusu ve API hesabı üzerinden ücretsiz sunulur; kişi başı günlük kullanım sınırlıdır ve bu sınır önceden haber verilmeden değiştirilebilir. Bu özellikler isteğe bağlıdır ve açık rıza vermeden çalışmaz. Üretilen içerik hatalı olabilir; doğrulamadan işlem yapma. Ekran görüntüsünden okunan rakamları kaydetmeden önce kontrol et.'],
+      ['h', '4. Hesap'],
+      ['p', 'Uygulamayı hesapsız ya da Google veya e-posta hesabınla kullanabilirsin. Hesabının güvenliğinden ve şifrenin gizliliğinden sen sorumlusun. Hesabını ve verilerini istediğin an Uygulamadan silebilirsin. Geliştirici, bu şartlara aykırı kullanım hâlinde hesabı askıya alabilir ya da silebilir. Claude yorumu gibi yapay zekâ özellikleri bu sürümde sunulmaz.'],
       ['h', '5. Senin yükümlülüklerin'],
       ['ul', [
         '18 yaşından büyük olmalısın.',
         'Uygulamaya yalnızca kendi bilgilerini gir; başkasına ait kişisel veri yükleme.',
-        'Verilerin cihazında ya da claude.ai hesabında tutulur. Düzenli yedek almak senin sorumluluğundadır (Geçmiş → Yedek indir).',
+        'Verilerin cihazında ya da hesabında tutulur. Hesapsız kullanıyorsan düzenli yedek almak senin sorumluluğundadır (Geçmiş → Yedek indir).',
         'Uygulamayı ve fiyat kaynaklarını aşırı yükleyecek, bozacak ya da hukuka aykırı biçimde kullanmamalısın.'
       ]],
       ['h', '6. Sorumluluğun sınırı'],
       ['p', 'Uygulama ücretsizdir ve "olduğu gibi" sunulur; kesintisiz ya da hatasız çalışacağı garanti edilmez. Yürürlükteki mevzuatın izin verdiği ölçüde Geliştirici; Uygulamadaki bilgi, liste, yorum ve önerilere dayanılarak verilen yatırım kararlarından, fiyat ve hesaplama hatalarından, kesintilerden ve veri kaybından doğan doğrudan ya da dolaylı zararlardan sorumlu değildir. Geliştiricinin kast ve ağır ihmalinden doğan sorumluluğu saklıdır.'],
       ['h', '7. Üçüncü taraf hizmetler'],
-      ['p', 'Uygulama GitHub üzerinde barındırılır, yazı tiplerini Google Fonts\'tan yükler; claude.ai sürümü ve Claude özellikleri Anthropic\'in hizmetlerini kullanır. Haber bağlantıları Midas\'ın sitesinde açılır. Bu hizmetler kendi kullanım şartlarına ve gizlilik politikalarına tabidir.'],
+      ['p', 'Uygulama GitHub üzerinde barındırılır; hesaplar ve hesap verileri Google Firebase\'de tutulur; yazı tiplerini Google Fonts\'tan yükler; claude.ai sürümü Anthropic\'in hizmetlerini kullanır. Haber bağlantıları Midas\'ın sitesinde açılır. Bu hizmetler kendi kullanım şartlarına ve gizlilik politikalarına tabidir.'],
       ['h', '8. Değişiklikler'],
-      ['p', 'Geliştirici bu şartları, Uygulamanın özelliklerini değiştirebilir ya da Uygulamayı yayından kaldırabilir. Şartların güncel sürümü her açılışta gösterilir ve yeniden onayın istenir.'],
+      ['p', 'Geliştirici bu şartları, Uygulamanın özelliklerini değiştirebilir ya da Uygulamayı yayından kaldırabilir. Şartlar değiştiğinde güncel sürüm gösterilir ve yeniden onayın istenir.'],
       ['h', '9. Uygulanacak hukuk'],
       ['p', 'Bu şartlara Türkiye Cumhuriyeti hukuku uygulanır. Tüketici sıfatın varsa 6502 sayılı Tüketicinin Korunması Hakkında Kanun\'dan doğan hakların saklıdır.'],
       ['h', '10. İletişim'], ['link', ILETISIM]
@@ -1448,40 +1589,38 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['h', 'Veri sorumlusu'], ['p', SORUMLU + '. Başvuru ve sorular için:'], ['link', ILETISIM],
       ['h', 'Önce kısaca'],
       ['ul', [
-        'Hesapsız (GitHub) sürümde girdiğin portföy bilgileri yalnızca kendi cihazındaki tarayıcı depolamasında tutulur. Geliştiriciye ya da bir sunucuya gönderilmez; Geliştirici bu verileri göremez.',
-        'claude.ai sürümünde veriler senin claude.ai hesabına bağlı alanda, Anthropic\'in sunucularında tutulur. Geliştirici bu verilere Uygulama üzerinden erişmez, satmaz, reklam için kullanmaz.',
-        'Claude özelliklerini kullanırsan portföy bilgilerin yorum üretmek için Anthropic\'e (ABD) gönderilir. Uygulama sürümünde bu gönderim Geliştiricinin Cloudflare üzerindeki ara sunucusundan geçer; ara sunucu portföy bilgilerini, ekran görüntülerini ve soruları saklamaz, kayıt (log) tutmaz. Bu yalnızca açık rıza verirsen olur.'
+        'Hesapsız kullanırsan girdiğin portföy bilgileri yalnızca kendi cihazındaki tarayıcı depolamasında tutulur. Geliştiriciye ya da bir sunucuya gönderilmez.',
+        'Hesabınla (Google ya da e-posta) giriş yaparsan portföy bilgilerin ve e-posta adresin, her cihazda aynı defteri görebilmen için Google Firebase\'de senin hesabına bağlı olarak saklanır. Güvenlik kuralları gereği başka kullanıcılar bu verileri göremez.',
+        'Geliştirici, Firebase yönetim panelinden hesap verilerine teknik olarak erişebilir. Yalnızca senin talebinle ya da bir arızayı gidermek için bakar; verilerini satmaz, reklam için kullanmaz, başkasıyla paylaşmaz.',
+        'claude.ai sürümü yalnızca Geliştiricinin kendi kullanımı içindir; Claude yorumu yalnızca orada çalışır.'
       ]],
       ['h', 'İşlenen veriler'],
       ['ul', [
+        'Hesap bilgileri: e-posta adresin; Google ile girersen Google hesabındaki adın ve profil fotoğrafının adresi; Firebase kullanıcı kimliği; hesap oluşturma ve son giriş zamanı. E-postayla kayıt olursan şifren Firebase\'de geri çevrilemez biçimde (hash) tutulur; Geliştirici şifreni göremez.',
         'Finansal bilgiler: varlık kodu ve adı, adet, fiyat, ortalama maliyet, aylık ekleme tutarı, hedef oranlar, günlük değer geçmişi.',
-        'Görsel: portföy ekranından yüklediğin ekran görüntüleri (yalnızca okuma için gönderilir; Uygulama görüntüyü saklamaz).',
-        'Claude\'a yazdığın sorular ve üretilen son yorum.',
-        'claude.ai sürümünde claude.ai\'nin Uygulamaya verdiği kullanıcı kimliği.',
-        'Uygulama sürümünde Claude özelliklerini kullanırsan: cihazında rastgele oluşturulan bir kimlik ve IP adresinin tek yönlü özeti; yalnızca günlük kullanım sınırını saymak için tutulur ve en geç iki gün içinde silinir.',
-        'Teknik bilgiler: sayfa, fiyat dosyası ve yazı tipleri yüklenirken IP adresin ve tarayıcı bilgilerin GitHub ve Google sunucularına iletilir.',
-        'Onay kaydı: son onay tarihin, onayladığın metin sürümü ve açık rıza durumun (yalnızca cihazında).'
+        'Teknik bilgiler: sayfa, fiyat dosyası ve yazı tipleri yüklenirken ve giriş yaparken IP adresin ve tarayıcı bilgilerin GitHub ve Google sunucularına iletilir.',
+        'Onay kaydı: son onay tarihin, onayladığın metin sürümü ve açık rıza durumun (yalnızca cihazında).',
+        'claude.ai sürümünde (yalnızca Geliştirici için): claude.ai kullanıcı kimliği, yüklenen ekran görüntüleri ve Claude\'a yazılan sorular.'
       ]],
       ['h', 'Amaçlar'],
-      ['p', 'Portföyünü kaydetmek ve değerini hesaplamak, aylık ekleme planını göstermek, istersen ekran görüntüsünden varlıklarını okumak ve Claude yorumu üretmek, onaylarını kaydetmek ve Uygulamanın teknik olarak çalışmasını sağlamak.'],
+      ['p', 'Hesabını oluşturmak ve girişini doğrulamak, portföyünü kaydetmek ve cihazların arasında eşitlemek, değerini hesaplamak, aylık ekleme planını göstermek, şifre yenileme ve e-posta doğrulama iletileri göndermek, onaylarını kaydetmek ve Uygulamanın güvenli çalışmasını sağlamak.'],
       ['h', 'Hukuki sebepler'],
       ['ul', [
-        'KVKK md. 5/2-c: Kullanım Şartları kapsamında hizmetin sunulması için zorunlu olması.',
-        'KVKK md. 5/2-f: Uygulamanın güvenli ve teknik olarak çalışması için meşru menfaat.',
-        'KVKK md. 5/1 ve md. 9: Claude özellikleri kapsamında Anthropic\'e (ABD) aktarım için açık rızan.'
+        'KVKK md. 5/2-c: hesabın ve Kullanım Şartları kapsamındaki hizmetin sunulması için zorunlu olması.',
+        'KVKK md. 5/2-f: Uygulamanın ve hesapların güvenliği için meşru menfaat.',
+        'KVKK md. 5/1 ve md. 9: hesap verilerinin Google\'ın yurt dışındaki sunucularında saklanması için giriş yaparken verdiğin açık rıza.'
       ]],
       ['h', 'Toplama yöntemi'],
-      ['p', 'Verileri sen girersin ya da ekran görüntüsünden okutursun; değer geçmişi ve onay kaydı otomatik oluşur. Hepsi elektronik ortamda işlenir.'],
+      ['p', 'Portföy bilgilerini sen girersin. Hesap bilgilerin Google ile girişte Google\'dan, e-postayla kayıtta senden alınır. Değer geçmişi ve onay kaydı otomatik oluşur. Hepsi elektronik ortamda işlenir.'],
       ['h', 'Kimlere aktarılır'],
       ['ul', [
-        'Anthropic PBC (ABD): claude.ai sürümünde verilerin saklanması; açık rızan varsa Claude yorumu, soru ve ekran görüntüsü okuma.',
+        'Google LLC ve Google Ireland Ltd. (Firebase Authentication ve Cloud Firestore): hesabının ve hesabındaki portföy verilerinin saklanması. Veritabanı Avrupa\'daki veri merkezlerinde tutulur; Google\'ın destek ve güvenlik işlemleri için başka ülkelerden erişim olabilir.',
         'GitHub, Inc. (ABD): Uygulamanın ve fiyat dosyasının barındırılması (teknik bilgiler).',
-        'Google LLC (ABD): yazı tiplerinin yüklenmesi (teknik bilgiler).',
-        'Cloudflare, Inc. (ABD): uygulama sürümünde Claude isteklerini Anthropic\'e ileten ara sunucunun barındırılması (açık rızan varsa).'
+        'Google LLC (ABD): yazı tiplerinin yüklenmesi (teknik bilgiler).'
       ]],
-      ['p', 'Yurt dışına aktarım KVKK md. 9 çerçevesinde yapılır. Uygulamanın çalışması için zorunlu olmayan Claude özellikleri açık rızana bağlıdır; rıza vermezsen bu özellikler kapalı kalır, diğer her şey çalışır.'],
+      ['p', 'Hesap verilerinin yurt dışına aktarımı KVKK md. 9 çerçevesinde açık rızana dayanır. Hesap açmak zorunlu değildir; rıza vermezsen Uygulamayı hesapsız kullanabilirsin.'],
       ['h', 'Saklama süresi'],
-      ['p', 'Cihazındaki veriler sen silene kadar (ya da tarayıcı verisini temizleyene kadar) durur. claude.ai hesabındaki veriler sen silene ya da hesabını kapatana kadar durur. Anthropic tarafındaki işleme ve saklama Anthropic\'in gizlilik politikasına tabidir. Geçmiş → Yasal metinler bölümündeki "Verilerimi sil" ile verilerini istediğin an silebilirsin.'],
+      ['p', 'Cihazındaki veriler sen silene kadar (ya da tarayıcı verisini temizleyene kadar) durur. Hesabındaki veriler sen silene ya da hesabını silene kadar durur. Geçmiş → Yasal metinler bölümündeki "Hesabımı sil" ile hesabını ve tüm verilerini istediğin an silebilirsin; silinen veriler Google\'ın yedekleme süreleri dolduğunda yedeklerden de kalkar.'],
       ['h', 'KVKK md. 11 kapsamındaki hakların'],
       ['ul', [
         'Kişisel verilerinin işlenip işlenmediğini öğrenme, işlenmişse bilgi isteme,',
@@ -1496,11 +1635,13 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
       ['p', 'Başvurunu yukarıdaki iletişim adresinden yapabilirsin; en geç 30 gün içinde ücretsiz yanıtlanır. Yanıtı yeterli bulmazsan Kişisel Verileri Koruma Kurulu\'na şikâyette bulunabilirsin.']
     ] },
     riza: { t: 'Açık Rıza Metni', b: [
-      ['p', 'Bu rıza isteğe bağlıdır. Vermezsen Claude yorumu, Claude\'a soru ve ekran görüntüsünden okuma kapalı kalır; Uygulamanın diğer bütün özellikleri çalışır.'],
-      ['h', 'Rıza verdiğin işlem'],
-      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; Claude özelliklerini kullandığımda portföy bilgilerimin (varlık kodları ve adları, adet, değer, maliyet, kâr/zarar, hedef oranlar, aylık ekleme tutarı), yüklediğim ekran görüntülerinin ve Claude\'a yazdığım soruların, yorum üretilmesi ve görüntüdeki varlıkların okunması amacıyla, uygulama sürümünde Cloudflare, Inc. (ABD) üzerindeki ara sunucu aracılığıyla, Anthropic PBC\'ye (Amerika Birleşik Devletleri) aktarılmasına ve orada işlenmesine açık rıza veriyorum.'],
+      ['p', 'Bu metin iki ayrı ve isteğe bağlı rızayı açıklar. Vermezsen Uygulamayı hesapsız kullanmaya devam edebilirsin.'],
+      ['h', '1. Hesapta saklama (Google Firebase)'],
+      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; hesabımla giriş yaptığımda e-posta adresimin ve portföy bilgilerimin (varlık kodları ve adları, adet, fiyat, maliyet, hedef oranlar, aylık eklemeler, değer geçmişi), hesabımda saklanması ve cihazlarım arasında eşitlenmesi amacıyla Google LLC ve Google Ireland Ltd.\'nin (Firebase) yurt dışındaki sunucularına aktarılmasına ve orada saklanmasına açık rıza veriyorum.'],
+      ['h', '2. Claude özellikleri (yalnızca claude.ai sürümü)'],
+      ['p', 'KVKK md. 5/1 ve md. 9 uyarınca; Claude yorumu ve ekran görüntüsünden okuma kullanıldığında portföy bilgilerinin, ekran görüntülerinin ve Claude\'a yazılan soruların yorum üretilmesi amacıyla Anthropic PBC\'ye (ABD) aktarılmasına açık rıza.'],
       ['h', 'Geri çekme'],
-      ['p', 'Rızanı istediğin an Geçmiş → Yasal metinler bölümünden geri çekebilirsin. Geri çekme ileriye dönük sonuç doğurur; daha önce gönderilmiş veriler için Anthropic\'in gizlilik politikası geçerlidir.']
+      ['p', 'Hesapta saklama rızanı geri çekmek için Geçmiş → Yasal metinler → "Hesabımı sil" de; hesabın ve verilerin silinir, Uygulamayı hesapsız kullanmaya devam edersin. Geri çekme ileriye dönük sonuç doğurur.']
     ] }
   };
 
@@ -1532,13 +1673,13 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     return [el('div', { class: 'onay' }, [
       mark,
       el('h1', { text: 'Başlamadan önce' }),
-      el('p', { class: 'lead', text: 'Portföy Defteri\'ni her açtığında bu onayı istiyoruz. Onaylamadan hiçbir hesaba bağlanılmaz ve verin yüklenmez.' }),
+      el('p', { class: 'lead', text: 'Her oturumun başında bu onayı istiyoruz; çıkış yapana ya da metinler değişene kadar tekrar sormayız. Onaylamadan hiçbir hesaba bağlanılmaz ve verin yüklenmez.' }),
       el('div', { class: 'beyan' }, [el('div', { class: 'eb', text: 'Risk beyanı' }), el('p', { text: RISK_BEYAN })]),
       el('div', { class: 'onaylar' }, [
         kutu('risk', ['Yukarıdaki risk beyanını okudum, kabul ediyorum. Ayrıntılar: ', lnk('risk'), '.']),
         kutu('sart', ['18 yaşından büyüğüm. ', lnk('sartlar'), '\'nı okudum, kabul ediyorum.']),
         kutu('kvkk', [lnk('kvkk'), '\'ni okudum.']),
-        kutu('riza', ['Claude özelliklerini kullanırsam verilerimin Anthropic\'e (ABD) aktarılmasına ', lnk('riza', 'Açık Rıza Metni'), ' kapsamında rıza veriyorum.'], true)
+        STANDALONE ? null : kutu('riza', ['Claude özelliklerini kullanırsam verilerimin Anthropic\'e (ABD) aktarılmasına ', lnk('riza', 'Açık Rıza Metni'), ' kapsamında rıza veriyorum.'], true)
       ]),
       devam,
       el('p', { class: 'fine', text: son && son.zaman ? 'Son onayın: ' + trTime(son.zaman) + ' · Metin sürümü ' + YASAL_SURUM : 'Metin sürümü ' + YASAL_SURUM })
@@ -1571,12 +1712,14 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   function yasalCard() {
     const son = onayKaydi();
     const docs = el('div', { class: 'doclist' }, ['sartlar', 'risk', 'kvkk', 'riza'].map(k => el('button', { type: 'button', onclick: () => docSheet(k) }, [el('span', { text: DOCS[k].t }), el('span', { text: 'Oku' })])));
-    const rizaBtn = S.riza
+    const rizaBtn = STANDALONE ? null : S.riza
       ? el('button', { class: 'btn ghost', type: 'button', text: 'Açık rızamı geri çek', onclick: () => { S.riza = false; onayYaz(); AI.text = ''; render(); toast('Açık rızan geri çekildi; Claude özellikleri kapandı'); } })
       : el('button', { class: 'btn ghost', type: 'button', text: 'Claude için açık rıza ver', onclick: () => rizaIste(() => toast('Açık rıza verildi')) });
-    const silBtn = el('button', { class: 'btn danger', type: 'button', text: S.mode === 'bulut' ? 'Hesabımdaki verilerimi sil' : 'Bu cihazdaki verilerimi sil', onclick: (e) => confirmInline(e.currentTarget, verileriSil, 'Tüm varlıklar ve geçmiş silinecek. Emin misin?') });
+    const silBtn = STANDALONE && FB.user
+      ? el('button', { class: 'btn danger', type: 'button', text: 'Hesabımı sil', onclick: (e) => confirmInline(e.currentTarget, hesabiSil, 'Hesabın ve tüm verilerin silinecek. Emin misin?') })
+      : el('button', { class: 'btn danger', type: 'button', text: S.mode === 'bulut' ? 'Hesabımdaki verilerimi sil' : 'Bu cihazdaki verilerimi sil', onclick: (e) => confirmInline(e.currentTarget, verileriSil, 'Tüm varlıklar ve geçmiş silinecek. Emin misin?') });
     return card('Yasal metinler', [docs,
-      el('p', { class: 'small muted', style: 'margin:10px 0 12px', text: 'Bu açılışta onaylandı' + (son && son.zaman ? ' (' + trTime(son.zaman) + ')' : '') + ' · Claude için açık rıza: ' + (S.riza ? 'verildi' : 'verilmedi') + ' · Sürüm ' + YASAL_SURUM }),
+      el('p', { class: 'small muted', style: 'margin:10px 0 12px', text: 'Bu oturum için onaylandı' + (son && son.zaman ? ' (' + trTime(son.zaman) + ')' : '') + (STANDALONE ? (FB.user ? ' · Hesap: ' + (FB.user.email || 'Google') : ' · Hesapsız') : ' · Claude için açık rıza: ' + (S.riza ? 'verildi' : 'verilmedi')) + ' · Sürüm ' + YASAL_SURUM }),
       el('div', { style: 'display:grid;gap:10px' }, [rizaBtn, silBtn])]);
   }
 
@@ -1593,6 +1736,8 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
     const gate = needsGate();
     document.querySelector('.nav').hidden = gate; document.getElementById('top').hidden = gate;
     if (gate) { main.append(el('div', { class: 'screen' }, gateScreen())); return; }
+    const yb = document.querySelector('#nav [data-tab=yorum]'); if (yb) yb.hidden = STANDALONE && !aiVar();
+    if (S.tab === 'yorum' && STANDALONE && !aiVar()) S.tab = 'ozet';
     const scr = { ozet: scrOzet, varlik: scrVarlik, ay: scrAy, gecmis: scrGecmis, haber: scrHaber, yorum: scrYorum }[S.tab] || scrOzet;
     main.append(el('div', { class: 'screen' }, scr().filter(Boolean)));
   }
@@ -1606,7 +1751,7 @@ Kesin "al/sat" deme; "incelemeye değer" gibi ifadeler kullan. En sona tek satı
   window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', window.scrollY > 4), { passive: true });
 
   if (STANDALONE && 'serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); }
-  render();
+  { const k = onayKaydi(); if (k && k.surum === YASAL_SURUM) { S.onay = true; S.riza = !!k.riza; boot(); } else render(); }
 })();
 </script>
 
